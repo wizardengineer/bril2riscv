@@ -1,0 +1,26 @@
+@main(a: int) {
+  cond: bool = undef;
+  set a.b1 a;
+  set cond.b1 cond;
+.b1:
+  cond.b1: bool = get;
+  a.b1: int = get;
+  cond.b1.1: bool = const true;
+  set a.here a.b1;
+  set cond.here cond.b1.1;
+  set a.there a.b1;
+  set cond.there cond.b1.1;
+  br cond.b1.1 .here .there;
+.here:
+  cond.here: bool = get;
+  a.here: int = get;
+  a.here.1: int = const 5;
+  set a.there a.here.1;
+  set cond.there cond.here;
+  jmp .there;
+.there:
+  cond.there: bool = get;
+  a.there: int = get;
+  print a.there;
+  ret;
+}

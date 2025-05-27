@@ -1,0 +1,17 @@
+# ARGS: true
+@main(cond: bool) {
+.top:
+  a: int = const 5;
+  set c a;
+  set d a;
+  br cond .here .there;
+.here:
+  b: int = const 7;
+  set c b;
+  set d b;
+.there:
+  c: int = get;
+  d: int = get;
+  print c;
+  print d;
+}

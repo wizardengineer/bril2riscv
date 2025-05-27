@@ -1,0 +1,24 @@
+@main {
+.a:
+  x: int = const 4;
+  set z x;
+  jmp .c;
+.b:
+  y: int = const 2;
+  set z y;
+  jmp .c;
+.c:
+  z: int = get;
+  z: float = get;
+  z: int = get x;
+}
+
+@more {
+  b: int = const 1;
+  c: int = const 2;
+  d: float = const 3.14;
+
+  set;
+  a: int = set b c;
+  set b d;
+}

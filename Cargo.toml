@@ -1,0 +1,32 @@
+[package]
+name = "bril2riscv"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+members = [
+    "bril-frontend",
+    "bril-ir",
+    "bril-passes",
+    "riscv-backend",
+    "cli",
+]
+
+[[bin]]
+name = "cli"
+path = "cli/src/main.rs"
+
+# [dependencies]
+# serde      = { version = "1.0", features = ["derive"] }
+# serde_json = "1.0"
+
+[dependencies.bril-rs]
+version = "0.1.0"
+path = "bril-extern/bril/bril-rs"
+features = ["ssa", "memory", "float", "speculate", "position"]
+
+[workspace.dependencies]
+serde      = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow     = "1.0"
+

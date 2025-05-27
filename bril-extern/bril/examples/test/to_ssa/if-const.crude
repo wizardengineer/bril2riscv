@@ -1,0 +1,44 @@
+@main {
+  b: int = undef;
+  a: int = undef;
+  cond: bool = undef;
+  set cond.b1 cond;
+  set a.b1 a;
+  set b.b1 b;
+.b1:
+  b.b1: int = get;
+  a.b1: int = get;
+  cond.b1: bool = get;
+  cond.b1.1: bool = const true;
+  set cond.true cond.b1.1;
+  set a.true a.b1;
+  set b.true b.b1;
+  set cond.false cond.b1.1;
+  set a.false a.b1;
+  set b.false b.b1;
+  br cond.b1.1 .true .false;
+.true:
+  b.true: int = get;
+  a.true: int = get;
+  cond.true: bool = get;
+  a.true.1: int = const 0;
+  set cond.zexit cond.true;
+  set a.zexit a.true.1;
+  set b.zexit b.true;
+  jmp .zexit;
+.false:
+  b.false: int = get;
+  a.false: int = get;
+  cond.false: bool = get;
+  b.false.1: int = const 1;
+  set cond.zexit cond.false;
+  set a.zexit a.false;
+  set b.zexit b.false.1;
+  jmp .zexit;
+.zexit:
+  b.zexit: int = get;
+  a.zexit: int = get;
+  cond.zexit: bool = get;
+  print a.zexit;
+  ret;
+}

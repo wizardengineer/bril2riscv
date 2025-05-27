@@ -1,0 +1,54 @@
+@main(a: int) {
+  one: int = undef;
+  is_term: bool = undef;
+  zero: int = undef;
+  set a.entry1 a;
+  set zero.entry1 zero;
+  set is_term.entry1 is_term;
+  set one.entry1 one;
+.entry1:
+  one.entry1: int = get;
+  is_term.entry1: bool = get;
+  zero.entry1: int = get;
+  a.entry1: int = get;
+  set a.while.cond a.entry1;
+  set zero.while.cond zero.entry1;
+  set is_term.while.cond is_term.entry1;
+  set one.while.cond one.entry1;
+  jmp .while.cond;
+.while.cond:
+  one.while.cond: int = get;
+  is_term.while.cond: bool = get;
+  zero.while.cond: int = get;
+  a.while.cond: int = get;
+  zero.while.cond.1: int = const 0;
+  is_term.while.cond.1: bool = eq a.while.cond zero.while.cond.1;
+  set a.while.finish a.while.cond;
+  set zero.while.finish zero.while.cond.1;
+  set is_term.while.finish is_term.while.cond.1;
+  set one.while.finish one.while.cond;
+  set a.while.body a.while.cond;
+  set zero.while.body zero.while.cond.1;
+  set is_term.while.body is_term.while.cond.1;
+  set one.while.body one.while.cond;
+  br is_term.while.cond.1 .while.finish .while.body;
+.while.body:
+  one.while.body: int = get;
+  is_term.while.body: bool = get;
+  zero.while.body: int = get;
+  a.while.body: int = get;
+  one.while.body.1: int = const 1;
+  a.while.body.1: int = sub a.while.body one.while.body.1;
+  set a.while.cond a.while.body.1;
+  set zero.while.cond zero.while.body;
+  set is_term.while.cond is_term.while.body;
+  set one.while.cond one.while.body.1;
+  jmp .while.cond;
+.while.finish:
+  one.while.finish: int = get;
+  is_term.while.finish: bool = get;
+  zero.while.finish: int = get;
+  a.while.finish: int = get;
+  print a.while.finish;
+  ret;
+}

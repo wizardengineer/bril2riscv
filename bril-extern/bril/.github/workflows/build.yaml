@@ -1,0 +1,74 @@
+name: build
+
+on:
+  push:
+    branches:
+     - main
+  pull_request:
+    branches:
+     - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+
+      - uses: actions/setup-python@v4
+        with:
+            python-version: '3.13'
+      - name: TypeScript check
+        run: deno check brili.ts brilck.ts ts2bril.ts
+
+      - name: Install all TypeScript tools
+        run: deno install brili.ts ; deno install brilck.ts ; deno install --allow-env --allow-read ts2bril.ts
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: Install Python tools
+        run: cd bril-txt ; uv tool install .
+
+      - name: Install Turnt
+        run: uv tool install turnt
+
+      - name: Problem matcher
+        run: echo '::add-matcher::.github/tap-matcher.json'
+      - name: Tests
+        run: PATH=$PATH:`yarn global bin` make test TURNTARGS=-v
+
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+
+      - uses: actions/setup-python@v4
+        with:
+            python-version: '3.13'
+      - name: Install brilck
+        run: deno install brilck.ts
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: Install Python tools
+        run: cd bril-txt ; uv tool install .
+
+      - name: Problem matcher
+        run: echo '::add-matcher::.github/brilck-matcher.json'
+      - name: brilck
+        run: PATH=$PATH:`yarn global bin` make check
+
+  style:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: TrueBrain/actions-flake8@master
+        with:
+          path: bril-txt

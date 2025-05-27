@@ -1,0 +1,56 @@
+@main {
+  done: bool = undef;
+  x: int = undef;
+  zero: int = undef;
+  one: int = undef;
+  set one.entry one;
+  set zero.entry zero;
+  set x.entry x;
+  set done.entry done;
+.entry:
+  done.entry: bool = get;
+  x.entry: int = get;
+  zero.entry: int = get;
+  one.entry: int = get;
+  one.entry.1: int = const 1;
+  zero.entry.1: int = const 0;
+  x.entry.1: int = const 5;
+  set one.loop one.entry.1;
+  set zero.loop zero.entry.1;
+  set x.loop x.entry.1;
+  set done.loop done.entry;
+  jmp .loop;
+.loop:
+  done.loop: bool = get;
+  x.loop: int = get;
+  zero.loop: int = get;
+  one.loop: int = get;
+  x.loop.1: int = sub x.loop one.loop;
+  done.loop.1: bool = eq x.loop.1 zero.loop;
+  set one.br one.loop;
+  set zero.br zero.loop;
+  set x.br x.loop.1;
+  set done.br done.loop.1;
+  jmp .br;
+.br:
+  done.br: bool = get;
+  x.br: int = get;
+  zero.br: int = get;
+  one.br: int = get;
+  set one.exit one.br;
+  set zero.exit zero.br;
+  set x.exit x.br;
+  set done.exit done.br;
+  set one.loop one.br;
+  set zero.loop zero.br;
+  set x.loop x.br;
+  set done.loop done.br;
+  br done.br .exit .loop;
+.exit:
+  done.exit: bool = get;
+  x.exit: int = get;
+  zero.exit: int = get;
+  one.exit: int = get;
+  print x.exit;
+  ret;
+}

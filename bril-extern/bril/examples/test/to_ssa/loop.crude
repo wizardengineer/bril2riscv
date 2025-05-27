@@ -1,0 +1,45 @@
+@main {
+  cond: bool = undef;
+  max: int = undef;
+  i: int = undef;
+  set i.entry i;
+  set max.entry max;
+  set cond.entry cond;
+.entry:
+  cond.entry: bool = get;
+  max.entry: int = get;
+  i.entry: int = get;
+  i.entry.1: int = const 1;
+  set i.loop i.entry.1;
+  set max.loop max.entry;
+  set cond.loop cond.entry;
+  jmp .loop;
+.loop:
+  cond.loop: bool = get;
+  max.loop: int = get;
+  i.loop: int = get;
+  max.loop.1: int = const 10;
+  cond.loop.1: bool = lt i.loop max.loop.1;
+  set i.body i.loop;
+  set max.body max.loop.1;
+  set cond.body cond.loop.1;
+  set i.exit i.loop;
+  set max.exit max.loop.1;
+  set cond.exit cond.loop.1;
+  br cond.loop.1 .body .exit;
+.body:
+  cond.body: bool = get;
+  max.body: int = get;
+  i.body: int = get;
+  i.body.1: int = add i.body i.body;
+  set i.loop i.body.1;
+  set max.loop max.body;
+  set cond.loop cond.body;
+  jmp .loop;
+.exit:
+  cond.exit: bool = get;
+  max.exit: int = get;
+  i.exit: int = get;
+  print i.exit;
+  ret;
+}
