@@ -1,6 +1,8 @@
 use anyhow::{bail, Result};
 use bril_frontend::Function as BrilFunction;
 use bril_frontend::Instruction as BrilInstr;
+use bril_frontend::Literal;
+use bril_frontend::Op;
 use bril_frontend::Program as BrilProgam;
 
 #[derive(Debug)]
@@ -98,6 +100,12 @@ pub enum IrInstruction {
     },
 
     // == Control Flow ==
+    Call {
+        target_func: String,
+        args: Vec<String>,
+        dest: String,
+    },
+
     Br {
         cond: String,
         then_lbl: String,
@@ -115,12 +123,17 @@ pub enum IrInstruction {
     // == Literals ==
     Const {
         dest: String,
-        value: i64,
+        value: Literal,
     },
 
     // == Misc ==
     Print {
         value: String,
+    },
+
+    Assign {
+        lhs: String,
+        rhs: String,
     },
 }
 
@@ -138,7 +151,7 @@ impl TryFrom<&BrilProgam> for IrModule {
     }
 }
 
-/// Converting Flat IrFunctions into CFG
+/// Converting Flat Functions into CFG
 fn convert_to_cfg(functions: &BrilFunction) -> Result<IrFunction> {
     let mut blocks = Vec::new();
 
@@ -161,37 +174,158 @@ fn convert_to_cfg(functions: &BrilFunction) -> Result<IrFunction> {
                 };
             }
 
-            BrilInstr::Const { dest, value, .. } => {
-                current_block.instrs.push(IrInstruction::Const {
-                    dest: dest.clone(),
-                    value: *value,
-                });
-            }
+            BrilInstr::Op(op) => match op {
+                Op::Const { dest, value, .. } => {
+                    current_block.instrs.push(IrInstruction::Const {
+                        dest: dest.clone(),
+                        value: value.clone(),
+                    });
+                }
 
-            BrilInstr::Add { dest, args, .. } => {
-                current_block.instrs.push(IrInstruction::Add {
-                    dest: dest.clone(),
-                    lhs: args[0].clone(),
-                    rhs: args[1].clone(),
-                });
-            }
+                // == Arithematic ==
+                Op::Add { dest, args, .. } => {
+                    current_block.instrs.push(IrInstruction::Add {
+                        dest: dest.clone(),
+                        lhs: args[0].clone(),
+                        rhs: args[1].clone(),
+                    });
+                }
 
-            BrilInstr::Print { args } => {
-                current_block.instrs.push(IrInstruction::Print {
-                    value: args[0].clone(),
-                });
-            }
+                Op::Mul { dest, args, .. } => {
+                    current_block.instrs.push(IrInstruction::Mul {
+                        dest: dest.clone(),
+                        lhs: args[0].clone(),
+                        rhs: args[1].clone(),
+                    });
+                }
 
-            BrilInstr::Ret { args } => {
-                current_block
-                    .instrs
-                    .push(IrInstruction::Ret { args: args.clone() });
-            }
+                Op::Sub { dest, args, .. } => {
+                    current_block.instrs.push(IrInstruction::Sub {
+                        dest: dest.clone(),
+                        lhs: args[0].clone(),
+                        rhs: args[1].clone(),
+                    });
+                }
 
-            //BrilInstr::Mul { dest, args, .. } => {}
-            //BrilInstr::Sub { dest, args, .. } => {}
-            //BrilInstr::Div { dest, args, .. } => {}
-            _ => bail!("Not there yet buddy...wait {:?}", instr),
+                Op::Div { dest, args, .. } => {
+                    current_block.instrs.push(IrInstruction::Div {
+                        dest: dest.clone(),
+                        lhs: args[0].clone(),
+                        rhs: args[1].clone(),
+                    });
+                }
+
+                // == Comparsion ==
+                Op::Eq { dest, args, .. } => {
+                    current_block.instrs.push(IrInstruction::Eq {
+                        dest: dest.clone(),
+                        lhs: args[0].clone(),
+                        rhs: args[1].clone(),
+                    });
+                }
+
+                Op::Lt { dest, args, .. } => {
+                    current_block.instrs.push(IrInstruction::Lt {
+                        dest: dest.clone(),
+                        lhs: args[0].clone(),
+                        rhs: args[1].clone(),
+                    });
+                }
+
+                Op::Gt { dest, args, .. } => {
+                    current_block.instrs.push(IrInstruction::Gt {
+                        dest: dest.clone(),
+                        lhs: args[0].clone(),
+                        rhs: args[1].clone(),
+                    });
+                }
+
+                Op::Ge { dest, args, .. } => {
+                    current_block.instrs.push(IrInstruction::Ge {
+                        dest: dest.clone(),
+                        lhs: args[0].clone(),
+                        rhs: args[1].clone(),
+                    });
+                }
+
+                Op::Le { dest, args, .. } => {
+                    current_block.instrs.push(IrInstruction::Le {
+                        dest: dest.clone(),
+                        lhs: args[0].clone(),
+                        rhs: args[1].clone(),
+                    });
+                }
+
+                // == Logical Operator ==
+                Op::Not { dest, args } => {
+                    current_block.instrs.push(IrInstruction::Not {
+                        dest: dest.clone(),
+                        args: args[0].clone(),
+                    });
+                }
+
+                Op::Or { dest, args } => {
+                    current_block.instrs.push(IrInstruction::Or {
+                        dest: dest.clone(),
+                        lhs: args[0].clone(),
+                        rhs: args[1].clone(),
+                    });
+                }
+
+                Op::And { dest, args } => {
+                    current_block.instrs.push(IrInstruction::And {
+                        dest: dest.clone(),
+                        lhs: args[0].clone(),
+                        rhs: args[1].clone(),
+                    });
+                }
+
+                // == Misc ==
+                Op::Print { args } => {
+                    current_block.instrs.push(IrInstruction::Print {
+                        value: args[0].clone(),
+                    });
+                }
+
+                Op::Id { dest, args, .. } => {
+                    current_block.instrs.push(IrInstruction::Assign {
+                        rhs: args[0].clone(),
+                        lhs: dest.clone(),
+                    });
+                }
+                // == Control flow ==
+                Op::Ret { args } => {
+                    current_block
+                        .instrs
+                        .push(IrInstruction::Ret { args: args.clone() });
+                }
+
+                Op::Jmp { labels } => {
+                    current_block.instrs.push(IrInstruction::Jmp {
+                        label: labels[0].clone(),
+                    });
+                }
+
+                Op::Call {
+                    dest, args, funcs, ..
+                } => {
+                    current_block.instrs.push(IrInstruction::Call {
+                        target_func: funcs[0].clone(),
+                        args: args.clone(),
+                        dest: dest.as_ref().unwrap().to_string(),
+                    });
+                }
+
+                Op::Br { args, labels } => {
+                    current_block.instrs.push(IrInstruction::Br {
+                        cond: args[0].clone(),
+                        then_lbl: labels[0].clone(),
+                        else_lbl: labels[1].clone(),
+                    });
+                }
+
+                _ => bail!("Not there yet buddy...wait {:?}", instr),
+            },
         }
     }
 
@@ -203,7 +337,7 @@ fn convert_to_cfg(functions: &BrilFunction) -> Result<IrFunction> {
         args: functions
             .args
             .iter()
-            .map(|arg| arg.value.clone()) // pull out each ValueDef.value
+            .map(|arg| arg.name.clone()) // pull out each ValueDef.name
             .collect(),
         blocks,
     })
