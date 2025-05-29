@@ -4,6 +4,7 @@ use bril_frontend::Instruction as BrilInstr;
 use bril_frontend::Literal;
 use bril_frontend::Op;
 use bril_frontend::Program as BrilProgam;
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub struct IrModule {
@@ -21,6 +22,8 @@ pub struct IrFunction {
 pub struct IrBasicBlock {
     pub label: String,
     pub instrs: Vec<IrInstruction>,
+    preds: Vec<String>,
+    succs: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -154,15 +157,96 @@ impl TryFrom<&BrilProgam> for IrModule {
 /// Converting Flat Functions into CFG
 /// TODO: Need to wire up edges for each block
 fn convert_to_cfg(functions: &BrilFunction) -> Result<IrFunction> {
+    let mut blocks = split_into_blocks(&functions.instrs)?;
+
+    // Build label to index mapping
+    let mut label_map = HashMap::new();
+    for (i, block) in blocks.iter().enumerate() {
+        label_map.insert(block.label.clone(), i);
+    }
+
+    // Connecting the block edges for both Successors & Predecessors
+    connect_block_edges(&mut blocks, &label_map)?;
+
+    Ok(IrFunction {
+        name: functions.name.clone(),
+        args: functions
+            .args
+            .iter()
+            .map(|arg| arg.name.clone()) // pull out each ValueDef.name
+            .collect(),
+        blocks,
+    })
+}
+
+fn connect_block_edges(
+    blocks: &mut [IrBasicBlock],
+    label_map: &HashMap<String, usize>,
+) -> Result<()> {
+    for i in 0..blocks.len() {
+        // Helps with determining if we should fall through the label
+        let fallthrough_lbl = if i + 1 < blocks.len() {
+            Some(blocks[i + 1].label.clone())
+        } else {
+            None
+        };
+
+        let block = &mut blocks[i];
+
+        if let Some(terminator) = block.instrs.last() {
+            match terminator {
+                IrInstruction::Br {
+                    then_lbl, else_lbl, ..
+                } => {
+                    block.succs.push(then_lbl.clone());
+                    block.succs.push(else_lbl.clone());
+                }
+
+                IrInstruction::Jmp { label } => {
+                    block.succs.push(label.clone());
+                }
+
+                IrInstruction::Ret { .. } => {}
+
+                // Fall through the next label, if needed so
+                _ => {
+                    if let Some(next_lbl) = fallthrough_lbl {
+                        block.succs.push(next_lbl);
+                    }
+                }
+            }
+        }
+    }
+
+    // Build up the list of predecessors
+    let mut list_of_preds = Vec::new();
+    for block in &*blocks {
+        for succs_lbl in &block.succs {
+            let idx = label_map[succs_lbl];
+            list_of_preds.push((idx, block.label.clone()));
+        }
+    }
+
+    // Connect the list of predecessors
+    for (idx, preds_lbl) in list_of_preds {
+        blocks[idx].preds.push(preds_lbl);
+    }
+
+    Ok(())
+}
+
+fn split_into_blocks(instrs: &Vec<BrilInstr>) -> Result<Vec<IrBasicBlock>> {
     let mut blocks = Vec::new();
 
     // Pointer to the current block we're managing
     let mut current_block = IrBasicBlock {
         label: "entry".to_string(),
         instrs: Vec::new(),
+        preds: Vec::new(),
+        succs: Vec::new(),
     };
 
-    for instr in &functions.instrs {
+    for instr in instrs {
         match instr {
             BrilInstr::Label { label } => {
                 // we're done with the current block
@@ -172,6 +256,8 @@ fn convert_to_cfg(functions: &BrilFunction) -> Result<IrFunction> {
                 current_block = IrBasicBlock {
                     label: label.clone(),
                     instrs: Vec::new(),
+                    preds: Vec::new(),
+                    succs: Vec::new(),
                 };
             }
 
@@ -333,13 +419,5 @@ fn convert_to_cfg(functions: &BrilFunction) -> Result<IrFunction> {
     // Push final block (current one)
     blocks.push(current_block);
 
-    Ok(IrFunction {
-        name: functions.name.clone(),
-        args: functions
-            .args
-            .iter()
-            .map(|arg| arg.name.clone()) // pull out each ValueDef.name
-            .collect(),
-        blocks,
-    })
+    Ok(blocks)
 }
