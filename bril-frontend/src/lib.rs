@@ -1,6 +1,8 @@
 pub mod json;
 pub use json::Function;
 pub use json::Instruction;
+pub use json::Literal;
+pub use json::Op;
 pub use json::Program;
 
 #[cfg(test)]
