@@ -152,6 +152,7 @@ impl TryFrom<&BrilProgam> for IrModule {
 }
 
 /// Converting Flat Functions into CFG
+/// TODO: Need to wire up edges for each block
 fn convert_to_cfg(functions: &BrilFunction) -> Result<IrFunction> {
     let mut blocks = Vec::new();
 
