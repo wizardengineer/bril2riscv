@@ -1,5 +1,4 @@
 use serde::Deserialize;
-use serde_json::Value as JsonValue;
 
 #[derive(Debug, Deserialize)]
 pub struct Program {

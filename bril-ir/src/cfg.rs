@@ -179,12 +179,16 @@ fn convert_to_cfg(functions: &BrilFunction) -> Result<IrFunction> {
     })
 }
 
+/// This functions deals with converting the IR into true
+/// Control-Flow Graphs by wiring up the edges
 fn connect_block_edges(
     blocks: &mut [IrBasicBlock],
     label_map: &HashMap<String, usize>,
 ) -> Result<()> {
+    // Build up the list of Successors
     for i in 0..blocks.len() {
-        // Helps with determining if we should fall through the label
+        // Helps with determining if we should fall through to
+        // the next block or label later on
         let fallthrough_lbl = if i + 1 < blocks.len() {
             Some(blocks[i + 1].label.clone())
         } else {
@@ -206,6 +210,7 @@ fn connect_block_edges(
                     block.succs.push(label.clone());
                 }
 
+                // TODO: I think I'll need to manage this later on?
                 IrInstruction::Ret { .. } => {}
 
                 // Fall through the next label, if needed so
@@ -246,6 +251,7 @@ fn split_into_blocks(instrs: &Vec<BrilInstr>) -> Result<Vec<IrBasicBlock>> {
         succs: Vec::new(),
     };
 
+    // through each instrs to create our blocks
     for instr in instrs {
         match instr {
             BrilInstr::Label { label } => {

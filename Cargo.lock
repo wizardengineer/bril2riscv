@@ -41,10 +41,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "bril2riscv"
+name = "bril2rv"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "bril-frontend",
+ "bril-ir",
  "bril-rs",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
