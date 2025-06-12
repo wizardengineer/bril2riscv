@@ -16,17 +16,62 @@ pub struct IrFunction {
     pub name: String,
     pub args: Vec<String>,
     pub blocks: Vec<IrBasicBlock>,
+    pub label_to_idx: HashMap<String, usize>,
 }
 
 #[derive(Debug)]
 pub struct IrBasicBlock {
     pub label: String,
     pub instrs: Vec<IrInstruction>,
-    preds: Vec<String>,
-    succs: Vec<String>,
+    pub preds: Vec<usize>,
+    pub succs: Vec<usize>,
 }
 
-#[derive(Debug)]
+impl IrFunction {
+    // just in case i was to do some testing
+    pub fn new(func_name: &str) -> Self {
+        Self {
+            name: func_name.to_string(),
+            args: Vec::new(),
+            blocks: Vec::new(),
+            label_to_idx: HashMap::new(),
+        }
+    }
+
+    pub fn add_block(&mut self, label: &str) -> usize {
+        // current block we're on
+        let idx = self.blocks.len();
+
+        self.blocks.push(IrBasicBlock {
+            label: label.to_string(),
+            instrs: Vec::new(),
+            preds: Vec::new(),
+            succs: Vec::new(),
+        });
+
+        // build our label to index mapping, for each
+        // block we add to the Block vectors
+        self.label_to_idx.insert(label.to_string(), idx);
+
+        // return index of newly added block index
+        idx
+    }
+
+    pub fn add_edge(&mut self, from: usize, to: usize) {
+        self.blocks[from].succs.push(to);
+        self.blocks[to].preds.push(from);
+    }
+
+    pub fn append_instr(&mut self, idx: usize, instr: &IrInstruction) {
+        self.blocks[idx].instrs.push(instr.clone());
+    }
+
+    pub fn block_index(&self, label: &String) -> Option<usize> {
+        self.label_to_idx.get(label).copied()
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum IrInstruction {
     // == Arithematic ==
     Add {
@@ -155,59 +200,35 @@ impl TryFrom<&BrilProgam> for IrModule {
 }
 
 /// Converting Flat Functions into CFG
-/// TODO: Need to wire up edges for each block
-fn convert_to_cfg(functions: &BrilFunction) -> Result<IrFunction> {
-    let mut blocks = split_into_blocks(&functions.instrs)?;
+fn convert_to_cfg(func: &BrilFunction) -> Result<IrFunction> {
+    let mut ir_func = IrFunction::new(&func.name);
+    split_into_blocks(&mut ir_func, func)?;
 
-    // Build label to index mapping
-    let mut label_map = HashMap::new();
-    for (i, block) in blocks.iter().enumerate() {
-        label_map.insert(block.label.clone(), i);
-    }
+    wire_block_edges(&mut ir_func)?;
 
-    // Connecting the block edges for both Successors & Predecessors
-    connect_block_edges(&mut blocks, &label_map)?;
-
-    Ok(IrFunction {
-        name: functions.name.clone(),
-        args: functions
-            .args
-            .iter()
-            .map(|arg| arg.name.clone()) // pull out each ValueDef.name
-            .collect(),
-        blocks,
-    })
+    Ok(ir_func)
 }
 
 /// This functions deals with converting the IR into true
-/// Control-Flow Graphs by wiring up the edges
-fn connect_block_edges(
-    blocks: &mut [IrBasicBlock],
-    label_map: &HashMap<String, usize>,
-) -> Result<()> {
-    // Build up the list of Successors
-    for i in 0..blocks.len() {
-        // Helps with determining if we should fall through to
-        // the next block or label later on
-        let fallthrough_lbl = if i + 1 < blocks.len() {
-            Some(blocks[i + 1].label.clone())
-        } else {
-            None
-        };
-
-        let block = &mut blocks[i];
-
-        if let Some(terminator) = block.instrs.last() {
+/// Control-Flow Graphs by wiring up the blocks
+fn wire_block_edges(func: &mut IrFunction) -> Result<()> {
+    // Build up the list of Successors & Predecessors fork
+    for curr_block_idx in 0..func.blocks.len() {
+        if let Some(terminator) = func.blocks[curr_block_idx].instrs.last() {
             match terminator {
                 IrInstruction::Br {
                     then_lbl, else_lbl, ..
                 } => {
-                    block.succs.push(then_lbl.clone());
-                    block.succs.push(else_lbl.clone());
+                    let then_idx = func.block_index(then_lbl).unwrap();
+                    let else_idx = func.block_index(else_lbl).unwrap();
+
+                    func.add_edge(curr_block_idx, then_idx);
+                    func.add_edge(curr_block_idx, else_idx);
                 }
 
                 IrInstruction::Jmp { label } => {
-                    block.succs.push(label.clone());
+                    let target_idx = func.block_index(label).unwrap();
+                    func.add_edge(curr_block_idx, target_idx);
                 }
 
                 // TODO: I think I'll need to manage this later on?
@@ -215,215 +236,158 @@ fn connect_block_edges(
 
                 // Fall through the next label, if needed so
                 _ => {
-                    if let Some(next_lbl) = fallthrough_lbl {
-                        block.succs.push(next_lbl);
+                    // check to see if we're still within the range of the blocks list
+                    if curr_block_idx + 1 < func.blocks.len() - 1 {
+                        func.add_edge(curr_block_idx, curr_block_idx + 1);
                     }
                 }
             }
         }
     }
 
-    // Build up the list of predecessors
-    let mut list_of_preds = Vec::new();
-    for block in &*blocks {
-        for succs_lbl in &block.succs {
-            let idx = label_map[succs_lbl];
-            list_of_preds.push((idx, block.label.clone()));
-        }
-    }
-
-    // Connect the list of predecessors
-    for (idx, preds_lbl) in list_of_preds {
-        blocks[idx].preds.push(preds_lbl);
-    }
-
     Ok(())
 }
 
-fn split_into_blocks(instrs: &Vec<BrilInstr>) -> Result<Vec<IrBasicBlock>> {
-    let mut blocks = Vec::new();
+fn split_into_blocks(func: &mut IrFunction, bril_func: &BrilFunction) -> Result<()> {
+    // Pointer to current block we'll be indexing in
+    let mut current_idx = func.add_block("entry");
 
-    // Pointer to the current block we're managing
-    let mut current_block = IrBasicBlock {
-        label: "entry".to_string(),
-        instrs: Vec::new(),
-        preds: Vec::new(),
-        succs: Vec::new(),
-    };
-
-    // through each instrs to create our blocks
-    for instr in instrs {
+    // 2) Now walk each Bril instruction in order:
+    let bril_instrs = &bril_func.instrs;
+    for instr in bril_instrs {
         match instr {
             BrilInstr::Label { label } => {
-                // we're done with the current block
-                blocks.push(current_block);
-
-                // manage our new block
-                current_block = IrBasicBlock {
-                    label: label.clone(),
-                    instrs: Vec::new(),
-                    preds: Vec::new(),
-                    succs: Vec::new(),
-                };
+                // Whenever we see a Bril label, start a new block with that name:
+                // (subsequent instructions go into this new block)
+                current_idx = func.add_block(&label);
             }
 
-            BrilInstr::Op(op) => match op {
-                Op::Const { dest, value, .. } => {
-                    current_block.instrs.push(IrInstruction::Const {
+            BrilInstr::Op(op) => {
+                // Translate each Bril “op” into an IrInstruction instance.
+                let ir_inst = match op {
+                    Op::Const { dest, value, .. } => IrInstruction::Const {
                         dest: dest.clone(),
                         value: value.clone(),
-                    });
-                }
+                    },
 
-                // == Arithematic ==
-                Op::Add { dest, args, .. } => {
-                    current_block.instrs.push(IrInstruction::Add {
+                    // == Arithmetic ==
+                    Op::Add { dest, args, .. } => IrInstruction::Add {
                         dest: dest.clone(),
                         lhs: args[0].clone(),
                         rhs: args[1].clone(),
-                    });
-                }
+                    },
 
-                Op::Mul { dest, args, .. } => {
-                    current_block.instrs.push(IrInstruction::Mul {
+                    Op::Mul { dest, args, .. } => IrInstruction::Mul {
                         dest: dest.clone(),
                         lhs: args[0].clone(),
                         rhs: args[1].clone(),
-                    });
-                }
+                    },
 
-                Op::Sub { dest, args, .. } => {
-                    current_block.instrs.push(IrInstruction::Sub {
+                    Op::Sub { dest, args, .. } => IrInstruction::Sub {
                         dest: dest.clone(),
                         lhs: args[0].clone(),
                         rhs: args[1].clone(),
-                    });
-                }
+                    },
 
-                Op::Div { dest, args, .. } => {
-                    current_block.instrs.push(IrInstruction::Div {
+                    Op::Div { dest, args, .. } => IrInstruction::Div {
                         dest: dest.clone(),
                         lhs: args[0].clone(),
                         rhs: args[1].clone(),
-                    });
-                }
+                    },
 
-                // == Comparsion ==
-                Op::Eq { dest, args, .. } => {
-                    current_block.instrs.push(IrInstruction::Eq {
+                    // == Comparison ==
+                    Op::Eq { dest, args, .. } => IrInstruction::Eq {
                         dest: dest.clone(),
                         lhs: args[0].clone(),
                         rhs: args[1].clone(),
-                    });
-                }
+                    },
 
-                Op::Lt { dest, args, .. } => {
-                    current_block.instrs.push(IrInstruction::Lt {
+                    Op::Lt { dest, args, .. } => IrInstruction::Lt {
                         dest: dest.clone(),
                         lhs: args[0].clone(),
                         rhs: args[1].clone(),
-                    });
-                }
+                    },
 
-                Op::Gt { dest, args, .. } => {
-                    current_block.instrs.push(IrInstruction::Gt {
+                    Op::Gt { dest, args, .. } => IrInstruction::Gt {
                         dest: dest.clone(),
                         lhs: args[0].clone(),
                         rhs: args[1].clone(),
-                    });
-                }
+                    },
 
-                Op::Ge { dest, args, .. } => {
-                    current_block.instrs.push(IrInstruction::Ge {
+                    Op::Ge { dest, args, .. } => IrInstruction::Ge {
                         dest: dest.clone(),
                         lhs: args[0].clone(),
                         rhs: args[1].clone(),
-                    });
-                }
+                    },
 
-                Op::Le { dest, args, .. } => {
-                    current_block.instrs.push(IrInstruction::Le {
+                    Op::Le { dest, args, .. } => IrInstruction::Le {
                         dest: dest.clone(),
                         lhs: args[0].clone(),
                         rhs: args[1].clone(),
-                    });
-                }
+                    },
 
-                // == Logical Operator ==
-                Op::Not { dest, args } => {
-                    current_block.instrs.push(IrInstruction::Not {
+                    // == Logical ==
+                    Op::Not { dest, args } => IrInstruction::Not {
                         dest: dest.clone(),
                         args: args[0].clone(),
-                    });
-                }
+                    },
 
-                Op::Or { dest, args } => {
-                    current_block.instrs.push(IrInstruction::Or {
+                    Op::Or { dest, args } => IrInstruction::Or {
                         dest: dest.clone(),
                         lhs: args[0].clone(),
                         rhs: args[1].clone(),
-                    });
-                }
+                    },
 
-                Op::And { dest, args } => {
-                    current_block.instrs.push(IrInstruction::And {
+                    Op::And { dest, args } => IrInstruction::And {
                         dest: dest.clone(),
                         lhs: args[0].clone(),
                         rhs: args[1].clone(),
-                    });
-                }
+                    },
 
-                // == Misc ==
-                Op::Print { args } => {
-                    current_block.instrs.push(IrInstruction::Print {
-                        value: args[0].clone(),
-                    });
-                }
-
-                Op::Id { dest, args, .. } => {
-                    current_block.instrs.push(IrInstruction::Assign {
-                        rhs: args[0].clone(),
-                        lhs: dest.clone(),
-                    });
-                }
-                // == Control flow ==
-                Op::Ret { args } => {
-                    current_block
-                        .instrs
-                        .push(IrInstruction::Ret { args: args.clone() });
-                }
-
-                Op::Jmp { labels } => {
-                    current_block.instrs.push(IrInstruction::Jmp {
-                        label: labels[0].clone(),
-                    });
-                }
-
-                Op::Call {
-                    dest, args, funcs, ..
-                } => {
-                    current_block.instrs.push(IrInstruction::Call {
+                    // == Control Flow ==
+                    Op::Call {
+                        dest, args, funcs, ..
+                    } => IrInstruction::Call {
                         target_func: funcs[0].clone(),
                         args: args.clone(),
-                        dest: dest.as_ref().unwrap().to_string(),
-                    });
-                }
+                        dest: dest.as_ref().unwrap().clone(),
+                    },
 
-                Op::Br { args, labels } => {
-                    current_block.instrs.push(IrInstruction::Br {
+                    Op::Br { args, labels } => IrInstruction::Br {
                         cond: args[0].clone(),
                         then_lbl: labels[0].clone(),
                         else_lbl: labels[1].clone(),
-                    });
-                }
+                    },
 
-                _ => bail!("Not there yet buddy...wait {:?}", instr),
-            },
+                    Op::Jmp { labels } => IrInstruction::Jmp {
+                        label: labels[0].clone(),
+                    },
+
+                    Op::Ret { args } => IrInstruction::Ret { args: args.clone() },
+
+                    // == Misc ==
+                    Op::Print { args } => IrInstruction::Print {
+                        value: args[0].clone(),
+                    },
+
+                    Op::Id { dest, args, .. } => IrInstruction::Assign {
+                        lhs: dest.clone(),
+                        rhs: args[0].clone(),
+                    },
+
+                    other => {
+                        panic!(
+                            "Unimplemented Bril opcode in split_into_blocks: {:?}",
+                            other
+                        );
+                    }
+                };
+
+                // 3) Append the newly created IR instruction into the “current” block
+                func.append_instr(current_idx, &ir_inst);
+            }
         }
     }
 
-    // Push final block (current one)
-    blocks.push(current_block);
-
-    Ok(blocks)
+    Ok(())
 }
