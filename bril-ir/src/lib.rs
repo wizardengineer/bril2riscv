@@ -73,5 +73,21 @@ mod tests {
         assert_eq!(ssa.idom[&3], 1);
         assert_eq!(ssa.idom[&4], 1);
         assert_eq!(ssa.idom[&5], 4);
+
+        ssa.compute_df(&temp_funcs[0]).unwrap();
+        let df = &ssa.dom_frontier;
+        dbg!("{:?}", &df);
+        assert_eq!(df.get(&2).unwrap().clone(), vec![4]);
+        assert_eq!(df.get(&3).unwrap().clone(), vec![4]);
+
+        ssa.build_dom_tree().unwrap();
+
+        let dt = &ssa.dom_tree;
+        dbg!(dt);
+        assert_eq!(dt.get(&4).unwrap().clone(), vec![5]);
+        let mut kids = dt.get(&1).unwrap().clone();
+        kids.sort();
+
+        assert_eq!(kids, vec![2, 3, 4]);
     }
 }
