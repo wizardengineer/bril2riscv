@@ -1,6 +1,6 @@
 use crate::cfg::IrFunction;
 use crate::cfg::IrModule;
-use anyhow::{Error, Result};
+use anyhow::Result;
 use std::collections::{BTreeMap, HashMap};
 
 /// Help with having more readable code
@@ -52,8 +52,8 @@ impl SSAFormation {
     }
 
     // TODO: Later in the future implement lengauer_tarjan_idom
-    pub fn compute_idom(&mut self, funcs: &IrFunction) -> Result<()> {
-        let n = funcs.blocks.len();
+    pub fn compute_idom(&mut self, func: &IrFunction) -> Result<()> {
+        let n = func.blocks.len();
         // usize::MAX means the idom is an unknown for now
         let mut idom_vec = vec![usize::MAX; n];
 
@@ -62,53 +62,67 @@ impl SSAFormation {
 
         // find the fix-point of the loop
         loop {
+            let mut changed = false;
             // b_idx = block index
             // starting from block 1 because idom[0] is 0
-            for b_idx in 1..n {
-                let preds = &funcs.blocks[b_idx].preds;
+            for b in 1..n {
+                let preds = &func.blocks[b].preds;
 
                 // Skip for if preds empty, we care for the preds because of the idom
                 if preds.is_empty() {
                     continue;
                 }
 
-                let mut new_idom = None;
-                for &p in preds {
-                    if idom_vec[p] != usize::MAX {
-                        new_idom = Some(p);
-                        break;
-                    }
-                }
-
-                let mut _new_idom = match new_idom {
-                    Some(x) => x,
+                let mut new_idom = match preds.iter().find(|&&p| idom_vec[p] != usize::MAX) {
+                    Some(&p) => p,
                     None => continue,
                 };
+
+                // collect into a Vec<usize>
+                let others: Vec<usize> = preds
+                    .iter()
+                    .copied()
+                    .filter(|&p| p != new_idom && idom_vec[p] != usize::MAX)
+                    .collect();
+
+                for p in others {
+                    let mut finger1 = p;
+                    let mut finger2 = new_idom;
+                    while finger1 != finger2 {
+                        while finger1 > finger2 {
+                            finger1 = idom_vec[finger1];
+                        }
+                        while finger2 > finger1 {
+                            finger2 = idom_vec[finger2];
+                        }
+                    }
+                    new_idom = finger1;
+                }
+
+                if idom_vec[b] != new_idom {
+                    idom_vec[b] = new_idom;
+                    changed = true;
+                }
+            }
+
+            if !changed {
+                break;
+            }
+
+            self.idom.clear();
+            for (block, &dom) in idom_vec.iter().enumerate() {
+                if dom == usize::MAX {
+                    panic!("could not compute idom for Block {}", block);
+                }
+                self.idom.insert(block, dom);
             }
         }
 
         Ok(())
     }
 
+    // TODO: Finish this and dom tree too. Then test it out
     pub fn compute_df(&mut self, funcs: &IrFunction) -> Result<()> {
-        for block in &funcs.blocks {
-            let current_idx = funcs.block_index(&block.label);
-
-            if !block.preds.len() >= 2 {
-                continue;
-            }
-
-            for pred in block.preds {
-                let mut runner = pred;
-                while runner != self.idom.get(current_idx).copied() {
-                    self.dom_frontier
-                        .entry(runner)
-                        .or_insert_with(Vec::new())
-                        .push(current_idx);
-                    runner = self.idom.get(pred).copied();
-                }
-            }
-        }
         Ok(())
     }
 }
