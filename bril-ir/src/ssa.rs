@@ -17,11 +17,11 @@ type BlockID = usize;
 ///2.Build the immediate-dominator (idom) tree.
 ///3.Compute each node’s DF (in a single pass over the CFG + dom-tree).
 ///4.Place ϕ-nodes for each variable at all blocks in the union of DF(definition blocks).
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct SSAFormation {
-    idom: HashMap<BlockID, usize>,
-    dom_tree: HashMap<BlockID, usize>,
-    dom_frontier: BTreeMap<BlockID, Vec<usize>>,
+    pub idom: HashMap<BlockID, BlockID>,
+    pub dom_tree: HashMap<BlockID, Vec<BlockID>>,
+    pub dom_frontier: BTreeMap<BlockID, Vec<BlockID>>,
 }
 
 /// Convert our IrModule into a true SSA form
@@ -45,7 +45,7 @@ impl SSAFormation {
         for func in funcs {
             out.compute_idom(func)?;
             out.compute_df(func)?;
-            //out.build_dom_tree(func)?;
+            out.build_dom_tree()?;
         }
 
         Ok(out)
@@ -85,6 +85,7 @@ impl SSAFormation {
                     .filter(|&p| p != new_idom && idom_vec[p] != usize::MAX)
                     .collect();
 
+                // climb the preds in order to see if the dominance chains match
                 for p in others {
                     let mut finger1 = p;
                     let mut finger2 = new_idom;
@@ -108,21 +109,59 @@ impl SSAFormation {
             if !changed {
                 break;
             }
+        }
 
-            self.idom.clear();
-            for (block, &dom) in idom_vec.iter().enumerate() {
-                if dom == usize::MAX {
-                    panic!("could not compute idom for Block {}", block);
-                }
-                self.idom.insert(block, dom);
+        self.idom.clear();
+        for (block, &dom) in idom_vec.iter().enumerate() {
+            if dom == usize::MAX {
+                panic!("could not compute idom for Block {}", block);
             }
+            self.idom.insert(block, dom);
         }
 
         Ok(())
     }
 
     // TODO: Finish this and dom tree too. Then test it out
-    pub fn compute_df(&mut self, funcs: &IrFunction) -> Result<()> {
+    pub fn compute_df(&mut self, func: &IrFunction) -> Result<()> {
+        self.dom_frontier.clear();
+
+        for block in &func.blocks {
+            let b = func.block_index(&block.label).unwrap();
+
+            // making sure it's a joint point
+            if block.preds.len() < 2 {
+                continue;
+            }
+
+            let idom_b = *self.idom.get(&b).expect("idom wasn't computed");
+
+            for &p in &block.preds {
+                let mut runner = p;
+
+                while runner != idom_b {
+                    let entry = self.dom_frontier.entry(runner).or_default();
+                    if !entry.contains(&b) {
+                        entry.push(b);
+                    }
+
+                    // climbing up the pred, the one runner is equal to
+                    runner = *self.idom.get(&runner).unwrap();
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn build_dom_tree(&mut self) -> Result<()> {
+        self.dom_tree.clear();
+
+        for (&b, &p) in &self.idom {
+            if b != p {
+                self.dom_tree.entry(p).or_default().push(b);
+            }
+        }
         Ok(())
     }
 }

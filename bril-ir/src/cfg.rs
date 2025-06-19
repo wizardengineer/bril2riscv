@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::Result;
 use bril_frontend::Function as BrilFunction;
 use bril_frontend::Instruction as BrilInstr;
 use bril_frontend::Literal;

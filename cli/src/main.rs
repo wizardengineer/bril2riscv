@@ -1,7 +1,6 @@
 use anyhow::Result;
 use bril_frontend::Program;
 use bril_ir::IrModule;
-use bril_ir::SSAFormation;
 use serde_json;
 
 fn main() -> Result<()> {
