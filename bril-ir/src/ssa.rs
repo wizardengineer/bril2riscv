@@ -36,11 +36,7 @@ impl TryFrom<&IrModule> for SSAFormation {
 
 impl SSAFormation {
     pub fn new(funcs: &[IrFunction]) -> Result<Self> {
-        let mut out = SSAFormation {
-            idom: HashMap::new(),
-            dom_tree: HashMap::new(),
-            dom_frontier: BTreeMap::new(),
-        };
+        let mut out = SSAFormation::default();
 
         for func in funcs {
             out.compute_idom(func)?;
@@ -158,6 +154,7 @@ impl SSAFormation {
         self.dom_tree.clear();
 
         for (&b, &p) in &self.idom {
+            // make sure we've skipped the entry
             if b != p {
                 self.dom_tree.entry(p).or_default().push(b);
             }

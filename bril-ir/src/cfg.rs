@@ -168,6 +168,11 @@ pub enum IrInstruction {
         args: Vec<String>,
     },
 
+    Phi {
+        value: String,              // value the be dictated by previous values
+        preds: Vec<Option<String>>, // this will store the labels of preds for blocks
+    },
+
     // == Literals ==
     Const {
         dest: String,
@@ -183,6 +188,18 @@ pub enum IrInstruction {
         lhs: String,
         rhs: String,
     },
+}
+
+impl IrInstruction {
+    // Returns a slice of a defined variable
+    // TODO: Need to impl & finish
+    pub fn defines(&self) -> &[String] {}
+}
+
+// TODO: Need to finish
+pub fn collect_defs() -> HashMap<String, Vec<usize>> {
+    let mut defs_map = HashMap::new();
+    defs_map
 }
 
 impl TryFrom<&BrilProgam> for IrModule {
