@@ -7,7 +7,7 @@ pub use ssa::SSAFormation;
 
 #[cfg(test)]
 mod tests {
-    use crate::cfg::IrBasicBlock;
+    use crate::cfg::{collect_defs, IrBasicBlock};
 
     use super::*;
 
@@ -61,8 +61,8 @@ mod tests {
     fn test_idom_df_and_domtree_on_diamond() {
         let func = diamond_cfg();
 
-        let temp_funcs = vec![func];
-        let mut ssa = SSAFormation::new(&temp_funcs).unwrap();
+        let mut temp_funcs = vec![func];
+        let mut ssa = SSAFormation::new(&mut temp_funcs).unwrap();
 
         // IDOM Compute
         ssa.compute_idom(&temp_funcs[0]).unwrap();
@@ -89,5 +89,37 @@ mod tests {
         kids.sort();
 
         assert_eq!(kids, vec![2, 3, 4]);
+    }
+
+    #[test]
+    fn test_collect_defs_of_two_different_defs() {
+        let mut func = diamond_cfg();
+        // Set of instrs that we'll be using for definitions sites
+        // both block B & C are going to be a definition of var X that will then be managed
+        // by block D (maybe)
+        let def_x_b = IrInstruction::Assign {
+            lhs: "x".to_string(),
+            rhs: "5".to_string(),
+        };
+
+        let def_x_c = IrInstruction::Assign {
+            lhs: "x".to_string(),
+            rhs: "10".to_string(),
+        };
+
+        // index 2 is block B
+        func.blocks[2].instrs.push(def_x_b.clone());
+
+        // index 3 is block C
+        func.blocks[3].instrs.push(def_x_c.clone());
+
+        let defs_map = collect_defs(&func);
+
+        let x_defintion_sites = defs_map.get("x").unwrap();
+        dbg!(x_defintion_sites);
+        assert_eq!(x_defintion_sites.len(), 2);
+        assert!(x_defintion_sites.contains(&2));
+        assert!(x_defintion_sites.contains(&3));
+        assert_eq!(defs_map.len(), 1);
     }
 }

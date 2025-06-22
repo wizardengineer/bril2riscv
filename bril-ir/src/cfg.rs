@@ -169,8 +169,8 @@ pub enum IrInstruction {
     },
 
     Phi {
-        value: String,              // value the be dictated by previous values
-        preds: Vec<Option<String>>, // this will store the labels of preds for blocks
+        var: String,               // value the be dictated by previous values
+        preds: Vec<Option<usize>>, // this will store the blocks id of preds for blocks
     },
 
     // == Literals ==
@@ -192,13 +192,43 @@ pub enum IrInstruction {
 
 impl IrInstruction {
     // Returns a slice of a defined variable
-    // TODO: Need to impl & finish
-    pub fn defines(&self) -> &[String] {}
+    pub fn defs(&self) -> &[String] {
+        match self {
+            IrInstruction::Add { dest, .. }
+            | IrInstruction::Sub { dest, .. }
+            | IrInstruction::Mul { dest, .. }
+            | IrInstruction::Div { dest, .. }
+            | IrInstruction::Eq { dest, .. }
+            | IrInstruction::Lt { dest, .. }
+            | IrInstruction::Gt { dest, .. }
+            | IrInstruction::Le { dest, .. }
+            | IrInstruction::Ge { dest, .. }
+            | IrInstruction::Or { dest, .. }
+            | IrInstruction::And { dest, .. }
+            | IrInstruction::Not { dest, .. }
+            | IrInstruction::Const { dest, .. }
+            | IrInstruction::Assign { lhs: dest, .. }
+            | IrInstruction::Phi { var: dest, .. } => std::slice::from_ref(dest),
+
+            IrInstruction::Call { dest, .. } => std::slice::from_ref(dest),
+
+            _ => &[],
+        }
+    }
 }
 
-// TODO: Need to finish
-pub fn collect_defs() -> HashMap<String, Vec<usize>> {
-    let mut defs_map = HashMap::new();
+/// For getting the mapping of each variable block(s) where variable might be defined
+pub fn collect_defs(func: &IrFunction) -> HashMap<String, Vec<usize>> {
+    let mut defs_map: HashMap<String, Vec<usize>> = HashMap::new();
+
+    for (block_idx, block) in func.blocks.iter().enumerate() {
+        for instr in &block.instrs {
+            for var in instr.defs() {
+                defs_map.entry(var.clone()).or_default().push(block_idx);
+            }
+        }
+    }
+
     defs_map
 }
 

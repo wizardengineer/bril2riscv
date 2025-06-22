@@ -1,7 +1,9 @@
+use crate::cfg::collect_defs;
 use crate::cfg::IrFunction;
 use crate::cfg::IrModule;
+use crate::IrInstruction;
 use anyhow::Result;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// Help with having more readable code
 type BlockID = usize;
@@ -25,23 +27,27 @@ pub struct SSAFormation {
 }
 
 /// Convert our IrModule into a true SSA form
-impl TryFrom<&IrModule> for SSAFormation {
+impl TryFrom<IrModule> for SSAFormation {
     type Error = anyhow::Error;
 
-    fn try_from(ir_module: &IrModule) -> Result<SSAFormation> {
-        let out = SSAFormation::new(&ir_module.functions)?;
+    fn try_from(mut module: IrModule) -> Result<SSAFormation> {
+        let out = SSAFormation::new(&mut module.functions)?;
         Ok(out)
     }
 }
 
 impl SSAFormation {
-    pub fn new(funcs: &[IrFunction]) -> Result<Self> {
+    pub fn new(funcs: &mut [IrFunction]) -> Result<Self> {
         let mut out = SSAFormation::default();
 
+        let mut def_sites_map: HashMap<String, Vec<BlockID>>;
         for func in funcs {
             out.compute_idom(func)?;
             out.compute_df(func)?;
             out.build_dom_tree()?;
+
+            def_sites_map = collect_defs(func);
+            out.phi_insert(func, def_sites_map);
         }
 
         Ok(out)
@@ -160,5 +166,33 @@ impl SSAFormation {
             }
         }
         Ok(())
+    }
+
+    pub fn phi_insert(&self, func: &mut IrFunction, def_sites_map: HashMap<String, Vec<BlockID>>) {
+        for (var, blocks_with_defs) in def_sites_map {
+            // `var` - the Variable we're looking for
+            // `blocks_with_defs` - blocks where `var` is defined at
+            let mut worklist: Vec<BlockID> = blocks_with_defs.clone();
+            let mut has_phi: HashSet<BlockID> = blocks_with_defs.iter().cloned().collect();
+
+            while !worklist.is_empty() {
+                let block_id_def = worklist.pop().unwrap();
+
+                if let Some(frontier) = self.dom_frontier.get(&block_id_def) {
+                    for &m in frontier {
+                        if has_phi.insert(m) {
+                            let block = &mut func.blocks[m];
+                            block.instrs.insert(
+                                0,
+                                IrInstruction::Phi {
+                                    var: var.clone(),
+                                    preds: vec![None; block.preds.len()],
+                                },
+                            );
+                        }
+                    }
+                }
+            }
+        }
     }
 }
