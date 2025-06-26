@@ -5,6 +5,9 @@ pub use cfg::IrInstruction;
 pub use cfg::IrModule;
 pub use ssa::SSAFormation;
 
+/// Help with having more readable code
+pub type BlockID = usize;
+
 #[cfg(test)]
 mod tests {
     use crate::cfg::{collect_defs, IrBasicBlock};
@@ -66,7 +69,7 @@ mod tests {
 
         // IDOM Compute
         ssa.compute_idom(&temp_funcs[0]).unwrap();
-        dbg!("{:?}", &ssa.idom);
+        println!("{:?}", &ssa.idom);
         assert_eq!(ssa.idom[&0], 0);
         assert_eq!(ssa.idom[&1], 0);
         assert_eq!(ssa.idom[&2], 1);
@@ -76,14 +79,14 @@ mod tests {
 
         ssa.compute_df(&temp_funcs[0]).unwrap();
         let df = &ssa.dom_frontier;
-        dbg!("{:?}", &df);
+        println!("{:?}", &df);
         assert_eq!(df.get(&2).unwrap().clone(), vec![4]);
         assert_eq!(df.get(&3).unwrap().clone(), vec![4]);
 
         ssa.build_dom_tree().unwrap();
 
         let dt = &ssa.dom_tree;
-        dbg!(dt);
+        println!("{:?}", dt);
         assert_eq!(dt.get(&4).unwrap().clone(), vec![5]);
         let mut kids = dt.get(&1).unwrap().clone();
         kids.sort();
@@ -91,9 +94,8 @@ mod tests {
         assert_eq!(kids, vec![2, 3, 4]);
     }
 
-    #[test]
-    fn test_collect_defs_of_two_different_defs() {
-        let mut func = diamond_cfg();
+    /// Helper function for creating multiple definitions for further testing
+    fn create_def_sites(func: &mut IrFunction) -> anyhow::Result<()> {
         // Set of instrs that we'll be using for definitions sites
         // both block B & C are going to be a definition of var X that will then be managed
         // by block D (maybe)
@@ -113,13 +115,37 @@ mod tests {
         // index 3 is block C
         func.blocks[3].instrs.push(def_x_c.clone());
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_collect_defs_of_two_different_defs() {
+        let mut func = diamond_cfg();
+        create_def_sites(&mut func).unwrap();
         let defs_map = collect_defs(&func);
 
         let x_defintion_sites = defs_map.get("x").unwrap();
-        dbg!(x_defintion_sites);
+        println!("{:?}", x_defintion_sites);
         assert_eq!(x_defintion_sites.len(), 2);
         assert!(x_defintion_sites.contains(&2));
         assert!(x_defintion_sites.contains(&3));
         assert_eq!(defs_map.len(), 1);
+    }
+
+    #[test]
+    fn test_simple_phi_testing() {
+        let mut func = diamond_cfg();
+        create_def_sites(&mut func).unwrap();
+        let defs_map = collect_defs(&func);
+        let mut temp_funcs = vec![func];
+        let ssa = SSAFormation::new(&mut temp_funcs).unwrap();
+
+        let x_defintion_sites = defs_map.get("x").unwrap();
+        println!("{:?}", x_defintion_sites);
+        for block in &temp_funcs[0].blocks {
+            for instr in block.instrs.clone() {
+                println!("{:?}", instr);
+            }
+        }
     }
 }

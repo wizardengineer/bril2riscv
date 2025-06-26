@@ -1,12 +1,10 @@
 use crate::cfg::collect_defs;
 use crate::cfg::IrFunction;
 use crate::cfg::IrModule;
+use crate::BlockID;
 use crate::IrInstruction;
 use anyhow::Result;
 use std::collections::{BTreeMap, HashMap, HashSet};
-
-/// Help with having more readable code
-type BlockID = usize;
 
 /// Set up the Dominator Trees and Dominance Frontier
 /// Using the Cytron algo for creating a SSA
@@ -41,13 +39,22 @@ impl SSAFormation {
         let mut out = SSAFormation::default();
 
         let mut def_sites_map: HashMap<String, Vec<BlockID>>;
+
         for func in funcs {
             out.compute_idom(func)?;
             out.compute_df(func)?;
             out.build_dom_tree()?;
 
             def_sites_map = collect_defs(func);
-            out.phi_insert(func, def_sites_map);
+            out.phi_insert(func, &def_sites_map);
+
+            let mut counter: HashMap<String, BlockID> = HashMap::new();
+            let mut stacks: HashMap<String, Vec<String>> = HashMap::new();
+
+            for (var, _def_sites) in def_sites_map {
+                counter.insert(var.clone(), 0);
+            }
+            rename_pass(0, &out.dom_tree, func, &mut counter, &mut stacks);
         }
 
         Ok(out)
@@ -168,16 +175,14 @@ impl SSAFormation {
         Ok(())
     }
 
-    pub fn phi_insert(&self, func: &mut IrFunction, def_sites_map: HashMap<String, Vec<BlockID>>) {
+    pub fn phi_insert(&self, func: &mut IrFunction, def_sites_map: &HashMap<String, Vec<BlockID>>) {
         for (var, blocks_with_defs) in def_sites_map {
             // `var` - the Variable we're looking for
             // `blocks_with_defs` - blocks where `var` is defined at
             let mut worklist: Vec<BlockID> = blocks_with_defs.clone();
             let mut has_phi: HashSet<BlockID> = blocks_with_defs.iter().cloned().collect();
 
-            while !worklist.is_empty() {
-                let block_id_def = worklist.pop().unwrap();
-
+            while let Some(block_id_def) = worklist.pop() {
                 if let Some(frontier) = self.dom_frontier.get(&block_id_def) {
                     for &m in frontier {
                         if has_phi.insert(m) {
@@ -185,7 +190,7 @@ impl SSAFormation {
                             block.instrs.insert(
                                 0,
                                 IrInstruction::Phi {
-                                    var: var.clone(),
+                                    dest: var.clone(),
                                     preds: vec![None; block.preds.len()],
                                 },
                             );
@@ -195,4 +200,63 @@ impl SSAFormation {
             }
         }
     }
+}
+
+/// Rename pass for all the
+pub fn rename_pass(
+    block_id: BlockID,
+    dom_tree: &HashMap<BlockID, Vec<BlockID>>,
+    func: &mut IrFunction,
+    counter: &mut HashMap<String, BlockID>,
+    stacks: &mut HashMap<String, Vec<String>>,
+) {
+    let current_block = &mut func.blocks[block_id];
+    // Manage all the Phi-nodes block
+    for instr in current_block.instrs.iter_mut() {
+        if let IrInstruction::Phi { dest, .. } = instr {
+            *dest = create_new_name(dest, counter, stacks);
+        }
+    }
+    // Rename all non-phi nodes for current block
+    for instr in current_block.instrs.iter_mut() {
+        match instr {
+            IrInstruction::Assign { lhs, rhs } => {}
+
+            IrInstruction::Add { lhs, rhs, dest }
+            | IrInstruction::Mul { lhs, rhs, dest }
+            | IrInstruction::Sub { lhs, rhs, dest }
+            | IrInstruction::Mul { lhs, rhs, dest }
+            | IrInstruction::Eq { lhs, rhs, dest }
+            | IrInstruction::Lt { lhs, rhs, dest } => {
+                *lhs = current_name(lhs, stacks);
+                *rhs = current_name(lhs, stacks);
+                *dest = create_new_name(dest, counter, stacks);
+            }
+            _ => {}
+        }
+    }
+}
+
+fn current_name(var: &str, stacks: &HashMap<String, Vec<String>>) -> String {
+    stacks
+        .get(var)
+        .and_then(|stk| stk.last().cloned())
+        .unwrap_or_else(|| var.to_string())
+}
+
+/// Helper function for creating a new name for variables in SSA Form
+fn create_new_name(
+    var: &str,
+    counter: &mut HashMap<String, BlockID>,
+    stacks: &mut HashMap<String, Vec<String>>,
+) -> String {
+    let count = counter.entry(var.to_string()).or_insert(0);
+    *count += 1;
+
+    let new_var = format!("{}{}", &var, count);
+    stacks
+        .entry(var.to_string())
+        .or_default()
+        .push(new_var.clone());
+    new_var
 }

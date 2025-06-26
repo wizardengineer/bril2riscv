@@ -1,3 +1,4 @@
+use crate::BlockID;
 use anyhow::Result;
 use bril_frontend::Function as BrilFunction;
 use bril_frontend::Instruction as BrilInstr;
@@ -169,7 +170,7 @@ pub enum IrInstruction {
     },
 
     Phi {
-        var: String,               // value the be dictated by previous values
+        dest: String,              // value the be dictated by previous values
         preds: Vec<Option<usize>>, // this will store the blocks id of preds for blocks
     },
 
@@ -208,7 +209,7 @@ impl IrInstruction {
             | IrInstruction::Not { dest, .. }
             | IrInstruction::Const { dest, .. }
             | IrInstruction::Assign { lhs: dest, .. }
-            | IrInstruction::Phi { var: dest, .. } => std::slice::from_ref(dest),
+            | IrInstruction::Phi { dest, .. } => std::slice::from_ref(dest),
 
             IrInstruction::Call { dest, .. } => std::slice::from_ref(dest),
 
@@ -218,7 +219,7 @@ impl IrInstruction {
 }
 
 /// For getting the mapping of each variable block(s) where variable might be defined
-pub fn collect_defs(func: &IrFunction) -> HashMap<String, Vec<usize>> {
+pub fn collect_defs(func: &IrFunction) -> HashMap<String, Vec<BlockID>> {
     let mut defs_map: HashMap<String, Vec<usize>> = HashMap::new();
 
     for (block_idx, block) in func.blocks.iter().enumerate() {
