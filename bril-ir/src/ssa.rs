@@ -202,7 +202,8 @@ impl SSAFormation {
     }
 }
 
-/// Rename pass for all the
+/// Rename pass for all the blocks, it'll convert every indiviual variables in each block
+/// with it's own unique name
 pub fn rename_pass(
     block_id: BlockID,
     dom_tree: &HashMap<BlockID, Vec<BlockID>>,
@@ -219,9 +220,15 @@ pub fn rename_pass(
     }
     // Rename all non-phi nodes for current block
     for instr in current_block.instrs.iter_mut() {
+        // TODO: Maybe find a better way of handling this? This relates
+        // to the ID opcode for Bril...
         match instr {
-            IrInstruction::Assign { lhs, rhs } => {}
+            IrInstruction::Assign { lhs, rhs } => {
+                *rhs = current_name(rhs, stacks);
+                *lhs = create_new_name(lhs, counter, stacks);
+            }
 
+            // TODO: Added more instructions
             IrInstruction::Add { lhs, rhs, dest }
             | IrInstruction::Mul { lhs, rhs, dest }
             | IrInstruction::Sub { lhs, rhs, dest }
@@ -229,14 +236,57 @@ pub fn rename_pass(
             | IrInstruction::Eq { lhs, rhs, dest }
             | IrInstruction::Lt { lhs, rhs, dest } => {
                 *lhs = current_name(lhs, stacks);
-                *rhs = current_name(lhs, stacks);
+                *rhs = current_name(rhs, stacks);
                 *dest = create_new_name(dest, counter, stacks);
             }
+
+            IrInstruction::Call { args, dest, .. } => {
+                if args.is_empty() {
+                    for a in args.iter_mut() {
+                        *a = current_name(a, stacks);
+                    }
+                }
+
+                *dest = create_new_name(dest, counter, stacks);
+            }
+
+            IrInstruction::Ret { args } => {
+                if args.is_empty() {
+                    for a in args.iter_mut() {
+                        *a = current_name(a, stacks);
+                    }
+                }
+            }
+
             _ => {}
+        }
+    }
+
+    // Check each of the successors of the current Block and fill in the Phi-nodes
+    // if needed
+    for &succ in &current_block.succs.clone() {
+        let succ_block = &mut func.blocks[succ];
+        for instr in &mut succ_block.instrs {
+            if let IrInstruction::Phi { dest, preds } = instr {
+                let idx = succ_block
+                    .preds
+                    .iter()
+                    .position(|&p| p == block_id)
+                    .unwrap();
+                preds[idx] = Some(current_name(dest, stacks));
+            }
+        }
+    }
+
+    // Recursively rename each immediate child of a block through the dominator tree
+    if let Some(child_blocks) = dom_tree.get(&block_id) {
+        for &child in child_blocks {
+            rename_pass(child, dom_tree, func, counter, stacks);
         }
     }
 }
 
+/// Helper function with getting the current variable with subscript (if there is any) on the stack
 fn current_name(var: &str, stacks: &HashMap<String, Vec<String>>) -> String {
     stacks
         .get(var)

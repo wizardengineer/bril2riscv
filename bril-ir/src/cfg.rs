@@ -170,8 +170,8 @@ pub enum IrInstruction {
     },
 
     Phi {
-        dest: String,              // value the be dictated by previous values
-        preds: Vec<Option<usize>>, // this will store the blocks id of preds for blocks
+        dest: String,               // value the be dictated by previous values
+        preds: Vec<Option<String>>, // this will store the blocks id of preds for blocks
     },
 
     // == Literals ==
