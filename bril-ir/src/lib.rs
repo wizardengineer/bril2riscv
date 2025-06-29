@@ -8,6 +8,19 @@ pub use ssa::SSAFormation;
 /// Help with having more readable code
 pub type BlockID = usize;
 
+macro_rules! function {
+    () => {{
+        fn f() {}
+        fn type_name_of<T>(_: T) -> &'static str {
+            std::any::type_name::<T>()
+        }
+        type_name_of(f)
+            .rsplit("::")
+            .find(|&part| part != "f" && part != "{{closure}}")
+            .expect("Short function name")
+    }};
+}
+
 #[cfg(test)]
 mod tests {
     use crate::cfg::{collect_defs, IrBasicBlock};
@@ -69,7 +82,8 @@ mod tests {
 
         // IDOM Compute
         ssa.compute_idom(&temp_funcs[0]).unwrap();
-        println!("{:?}", &ssa.idom);
+        println!("Test Function: {}", function!());
+        println!("  Idom: {:?}", &ssa.idom);
         assert_eq!(ssa.idom[&0], 0);
         assert_eq!(ssa.idom[&1], 0);
         assert_eq!(ssa.idom[&2], 1);
@@ -79,14 +93,14 @@ mod tests {
 
         ssa.compute_df(&temp_funcs[0]).unwrap();
         let df = &ssa.dom_frontier;
-        println!("{:?}", &df);
+        println!("  DomFrontier: {:?}", &df);
         assert_eq!(df.get(&2).unwrap().clone(), vec![4]);
         assert_eq!(df.get(&3).unwrap().clone(), vec![4]);
 
         ssa.build_dom_tree().unwrap();
 
         let dt = &ssa.dom_tree;
-        println!("{:?}", dt);
+        println!("  DomTree: {:?}", dt);
         assert_eq!(dt.get(&4).unwrap().clone(), vec![5]);
         let mut kids = dt.get(&1).unwrap().clone();
         kids.sort();
@@ -115,6 +129,14 @@ mod tests {
         // index 3 is block C
         func.blocks[3].instrs.push(def_x_c.clone());
 
+        //func.blocks[4].instrs.insert(
+        //    0,
+        //    IrInstruction::Phi {
+        //        dest: "x".to_string(),
+        //        sources: vec![None, None],
+        //    },
+        //);
+        //
         Ok(())
     }
 
@@ -124,8 +146,9 @@ mod tests {
         create_def_sites(&mut func).unwrap();
         let defs_map = collect_defs(&func);
 
+        println!("Test Function: {}", function!());
         let x_defintion_sites = defs_map.get("x").unwrap();
-        println!("{:?}", x_defintion_sites);
+        println!("  DefintionMap: {:?}", defs_map);
         assert_eq!(x_defintion_sites.len(), 2);
         assert!(x_defintion_sites.contains(&2));
         assert!(x_defintion_sites.contains(&3));
@@ -140,11 +163,14 @@ mod tests {
         let mut temp_funcs = vec![func];
         let ssa = SSAFormation::new(&mut temp_funcs).unwrap();
 
-        let x_defintion_sites = defs_map.get("x").unwrap();
-        println!("{:?}", x_defintion_sites);
+        println!("Test Function: {}", function!());
+        //let x_defintion_sites = defs_map.get("x").unwrap();
+
+        println!("  DefintionMap: {:?}", defs_map);
+
         for block in &temp_funcs[0].blocks {
             for instr in block.instrs.clone() {
-                println!("{:?}", instr);
+                println!("    {:?}", instr);
             }
         }
     }

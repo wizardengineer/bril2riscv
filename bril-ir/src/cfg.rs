@@ -7,12 +7,12 @@ use bril_frontend::Op;
 use bril_frontend::Program as BrilProgam;
 use std::collections::HashMap;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IrModule {
     pub functions: Vec<IrFunction>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IrFunction {
     pub name: String,
     pub args: Vec<String>,
@@ -20,7 +20,7 @@ pub struct IrFunction {
     pub label_to_idx: HashMap<String, usize>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IrBasicBlock {
     pub label: String,
     pub instrs: Vec<IrInstruction>,
@@ -170,8 +170,8 @@ pub enum IrInstruction {
     },
 
     Phi {
-        dest: String,               // value the be dictated by previous values
-        preds: Vec<Option<String>>, // this will store the blocks id of preds for blocks
+        dest: String,                 // value the be dictated by previous values
+        sources: Vec<Option<String>>, // this will store the blocks id of preds for blocks
     },
 
     // == Literals ==

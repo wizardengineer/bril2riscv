@@ -25,10 +25,10 @@ pub struct SSAFormation {
 }
 
 /// Convert our IrModule into a true SSA form
-impl TryFrom<IrModule> for SSAFormation {
+impl TryFrom<&mut IrModule> for SSAFormation {
     type Error = anyhow::Error;
 
-    fn try_from(mut module: IrModule) -> Result<SSAFormation> {
+    fn try_from(module: &mut IrModule) -> Result<SSAFormation> {
         let out = SSAFormation::new(&mut module.functions)?;
         Ok(out)
     }
@@ -38,14 +38,12 @@ impl SSAFormation {
     pub fn new(funcs: &mut [IrFunction]) -> Result<Self> {
         let mut out = SSAFormation::default();
 
-        let mut def_sites_map: HashMap<String, Vec<BlockID>>;
-
         for func in funcs {
             out.compute_idom(func)?;
             out.compute_df(func)?;
             out.build_dom_tree()?;
 
-            def_sites_map = collect_defs(func);
+            let def_sites_map = collect_defs(func);
             out.phi_insert(func, &def_sites_map);
 
             let mut counter: HashMap<String, BlockID> = HashMap::new();
@@ -53,6 +51,7 @@ impl SSAFormation {
 
             for (var, _def_sites) in def_sites_map {
                 counter.insert(var.clone(), 0);
+                stacks.insert(var.clone(), Vec::new());
             }
             rename_pass(0, &out.dom_tree, func, &mut counter, &mut stacks);
         }
@@ -191,9 +190,11 @@ impl SSAFormation {
                                 0,
                                 IrInstruction::Phi {
                                     dest: var.clone(),
-                                    preds: vec![None; block.preds.len()],
+                                    sources: vec![None; block.preds.len()],
                                 },
                             );
+
+                            worklist.push(m);
                         }
                     }
                 }
@@ -211,69 +212,82 @@ pub fn rename_pass(
     counter: &mut HashMap<String, BlockID>,
     stacks: &mut HashMap<String, Vec<String>>,
 ) {
-    let current_block = &mut func.blocks[block_id];
-    // Manage all the Phi-nodes block
-    for instr in current_block.instrs.iter_mut() {
-        if let IrInstruction::Phi { dest, .. } = instr {
-            *dest = create_new_name(dest, counter, stacks);
+    {
+        let blocks = &mut func.blocks;
+        // Manage all the Phi-nodes block
+        for instr in blocks[block_id].instrs.iter_mut() {
+            if let IrInstruction::Phi { dest, .. } = instr {
+                *dest = create_new_name(dest, counter, stacks);
+            }
         }
-    }
-    // Rename all non-phi nodes for current block
-    for instr in current_block.instrs.iter_mut() {
-        // TODO: Maybe find a better way of handling this? This relates
-        // to the ID opcode for Bril...
-        match instr {
-            IrInstruction::Assign { lhs, rhs } => {
-                *rhs = current_name(rhs, stacks);
-                *lhs = create_new_name(lhs, counter, stacks);
-            }
+        // Rename all non-phi instructions for current block
+        for instr in blocks[block_id].instrs.iter_mut() {
+            // TODO: Maybe find a better way of handling this? This relates
+            // to the ID opcode for Bril...
+            match instr {
+                IrInstruction::Assign { lhs, rhs } => {
+                    *rhs = current_name(rhs, stacks);
+                    *lhs = create_new_name(lhs, counter, stacks);
+                }
 
-            // TODO: Added more instructions
-            IrInstruction::Add { lhs, rhs, dest }
-            | IrInstruction::Mul { lhs, rhs, dest }
-            | IrInstruction::Sub { lhs, rhs, dest }
-            | IrInstruction::Mul { lhs, rhs, dest }
-            | IrInstruction::Eq { lhs, rhs, dest }
-            | IrInstruction::Lt { lhs, rhs, dest } => {
-                *lhs = current_name(lhs, stacks);
-                *rhs = current_name(rhs, stacks);
-                *dest = create_new_name(dest, counter, stacks);
-            }
+                IrInstruction::Not { dest, args } => {
+                    *args = current_name(args, stacks);
+                    *dest = create_new_name(dest, counter, stacks);
+                }
 
-            IrInstruction::Call { args, dest, .. } => {
-                if args.is_empty() {
-                    for a in args.iter_mut() {
-                        *a = current_name(a, stacks);
+                // TODO: Added more instructions
+                IrInstruction::Add { lhs, rhs, dest }
+                | IrInstruction::Mul { lhs, rhs, dest }
+                | IrInstruction::Sub { lhs, rhs, dest }
+                | IrInstruction::Div { lhs, rhs, dest }
+                | IrInstruction::Eq { lhs, rhs, dest }
+                | IrInstruction::Lt { lhs, rhs, dest }
+                | IrInstruction::Gt { lhs, rhs, dest }
+                | IrInstruction::Ge { lhs, rhs, dest }
+                | IrInstruction::Le { lhs, rhs, dest }
+                | IrInstruction::Or { lhs, rhs, dest }
+                | IrInstruction::And { lhs, rhs, dest } => {
+                    *lhs = current_name(lhs, stacks);
+                    *rhs = current_name(rhs, stacks);
+                    *dest = create_new_name(dest, counter, stacks);
+                }
+
+                IrInstruction::Call { args, dest, .. } => {
+                    if args.is_empty() {
+                        for a in args.iter_mut() {
+                            *a = current_name(a, stacks);
+                        }
+                    }
+
+                    *dest = create_new_name(dest, counter, stacks);
+                }
+
+                IrInstruction::Ret { args } => {
+                    if args.is_empty() {
+                        for a in args.iter_mut() {
+                            *a = current_name(a, stacks);
+                        }
                     }
                 }
 
-                *dest = create_new_name(dest, counter, stacks);
+                _ => {}
             }
-
-            IrInstruction::Ret { args } => {
-                if args.is_empty() {
-                    for a in args.iter_mut() {
-                        *a = current_name(a, stacks);
-                    }
-                }
-            }
-
-            _ => {}
         }
     }
 
     // Check each of the successors of the current Block and fill in the Phi-nodes
     // if needed
-    for &succ in &current_block.succs.clone() {
+    for succ in func.blocks[block_id].succs.clone() {
         let succ_block = &mut func.blocks[succ];
-        for instr in &mut succ_block.instrs {
-            if let IrInstruction::Phi { dest, preds } = instr {
+        for instr in succ_block.instrs.iter_mut() {
+            if let IrInstruction::Phi { dest, sources } = instr {
                 let idx = succ_block
                     .preds
                     .iter()
                     .position(|&p| p == block_id)
                     .unwrap();
-                preds[idx] = Some(current_name(dest, stacks));
+                // Source is the size of the preds
+                sources[idx] = Some(current_name(dest, stacks));
             }
         }
     }
@@ -284,10 +298,23 @@ pub fn rename_pass(
             rename_pass(child, dom_tree, func, counter, stacks);
         }
     }
+
+    // Now we have to pop all the values on the SSA rename stacks hashmap
+    // in order to have a distinct values
+    for instr in &func.blocks[block_id].instrs {
+        //println!("Instr!! {:#?}", &instr);
+        //println!("Block!! {:#?}", &func.blocks[block_id]);
+        for var in instr.defs() {
+            //println!("Var!! {}", var);
+            if stacks.contains_key(var) {
+                stacks.get_mut(var).expect("Something is wrong twin").pop();
+            }
+        }
+    }
 }
 
 /// Helper function with getting the current variable with subscript (if there is any) on the stack
-fn current_name(var: &str, stacks: &HashMap<String, Vec<String>>) -> String {
+fn current_name(var: &String, stacks: &HashMap<String, Vec<String>>) -> String {
     stacks
         .get(var)
         .and_then(|stk| stk.last().cloned())
