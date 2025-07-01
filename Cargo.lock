@@ -29,6 +29,10 @@ dependencies = [
 [[package]]
 name = "bril-passes"
 version = "0.1.0"
+dependencies = [
+ "bril-frontend",
+ "bril-ir",
+]
 
 [[package]]
 name = "bril-rs"
