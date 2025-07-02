@@ -51,6 +51,7 @@ dependencies = [
  "anyhow",
  "bril-frontend",
  "bril-ir",
+ "bril-passes",
  "bril-rs",
  "serde",
  "serde_json",
@@ -63,6 +64,7 @@ dependencies = [
  "anyhow",
  "bril-frontend",
  "bril-ir",
+ "bril-passes",
  "serde_json",
 ]
 

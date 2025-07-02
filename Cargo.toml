@@ -20,6 +20,7 @@ path = "cli/src/main.rs"
 [dependencies]
 bril-frontend = { path = "bril-frontend" }
 bril-ir       = { path = "bril-ir" }
+bril-passes = { path = "bril-passes" }
 anyhow.workspace = true
 serde_json.workspace = true
 serde.workspace = true
