@@ -22,8 +22,13 @@ impl FunctionPass for ConstantPropagationPass {
                         const_env.insert(dest.clone(), Some(value.clone()));
                     }
 
-                    IrInstruction::Assign { lhs, rhs }
-                    | IrInstruction::Add { lhs, rhs, .. }
+                    IrInstruction::Assign { rhs, .. } => {
+                        if let Some(Literal::Int(j)) = const_env.get(rhs).cloned().flatten() {
+                            *rhs = j.to_string();
+                        }
+                    }
+
+                    IrInstruction::Add { lhs, rhs, .. }
                     | IrInstruction::Mul { lhs, rhs, .. }
                     | IrInstruction::Sub { lhs, rhs, .. }
                     | IrInstruction::Div { lhs, rhs, .. } => {
@@ -54,6 +59,7 @@ impl FunctionPass for ConstantPropagationPass {
                             *cond = j.to_string();
                         }
                     }
+
                     IrInstruction::Ret { args } => {
                         for arg in args.iter_mut() {
                             if let Some(Literal::Int(i)) = const_env.get(arg).cloned().flatten() {

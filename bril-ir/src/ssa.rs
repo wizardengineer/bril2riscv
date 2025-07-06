@@ -253,7 +253,7 @@ pub fn rename_pass(
                 }
 
                 IrInstruction::Call { args, dest, .. } => {
-                    if args.is_empty() {
+                    if !args.is_empty() {
                         for a in args.iter_mut() {
                             *a = current_name(a, stacks);
                         }
@@ -262,8 +262,16 @@ pub fn rename_pass(
                     *dest = create_new_name(dest, counter, stacks);
                 }
 
+                IrInstruction::Print { values } => {
+                    if !values.is_empty() {
+                        for a in values.iter_mut() {
+                            *a = current_name(a, stacks);
+                        }
+                    }
+                }
+
                 IrInstruction::Ret { args } => {
-                    if args.is_empty() {
+                    if !args.is_empty() {
                         for a in args.iter_mut() {
                             *a = current_name(a, stacks);
                         }
@@ -330,7 +338,7 @@ fn create_new_name(
     let count = counter.entry(var.to_string()).or_insert(0);
     *count += 1;
 
-    let new_var = format!("{}{}", &var, count);
+    let new_var = format!("{}${}", &var, count);
     stacks
         .entry(var.to_string())
         .or_default()

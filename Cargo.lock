@@ -30,6 +30,7 @@ dependencies = [
 name = "bril-passes"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "bril-frontend",
  "bril-ir",
 ]

@@ -182,7 +182,7 @@ pub enum IrInstruction {
 
     // == Misc ==
     Print {
-        value: String,
+        values: Vec<String>,
     },
 
     Assign {
@@ -193,6 +193,7 @@ pub enum IrInstruction {
 
 impl IrInstruction {
     // Returns a slice of a defined variable
+    // describes what name does this instruction *write*
     pub fn defs(&self) -> &[String] {
         match self {
             IrInstruction::Add { dest, .. }
@@ -208,12 +209,41 @@ impl IrInstruction {
             | IrInstruction::And { dest, .. }
             | IrInstruction::Not { dest, .. }
             | IrInstruction::Const { dest, .. }
+            // TODO: Maybe we should remove the assign?
+            // Find something else to use
             | IrInstruction::Assign { lhs: dest, .. }
             | IrInstruction::Phi { dest, .. } => std::slice::from_ref(dest),
 
             IrInstruction::Call { dest, .. } => std::slice::from_ref(dest),
 
             _ => &[],
+        }
+    }
+
+    // describes what name does this instruction *reads*
+    pub fn uses(&self) -> Vec<String> {
+        match self {
+            IrInstruction::Add { lhs, rhs, .. }
+            | IrInstruction::Sub { lhs, rhs, .. }
+            | IrInstruction::Mul { lhs, rhs, .. }
+            | IrInstruction::Div { lhs, rhs, .. }
+            | IrInstruction::Eq { lhs, rhs, .. }
+            | IrInstruction::Lt { lhs, rhs, .. }
+            | IrInstruction::Gt { lhs, rhs, .. }
+            | IrInstruction::Ge { lhs, rhs, .. }
+            | IrInstruction::Le { lhs, rhs, .. }
+            | IrInstruction::Or { lhs, rhs, .. }
+            | IrInstruction::And { lhs, rhs, .. } => vec![lhs.to_string(), rhs.to_string()],
+
+            IrInstruction::Not { args, .. } => vec![args.to_string()],
+
+            IrInstruction::Br { cond, .. } => vec![cond.to_string()],
+            IrInstruction::Call { args, .. } => args.to_vec(),
+            IrInstruction::Ret { args, .. } => args.to_vec(),
+            IrInstruction::Phi { sources, .. } => sources.iter().flatten().cloned().collect(),
+
+            IrInstruction::Print { values, .. } => values.to_vec(),
+            _ => Vec::new(),
         }
     }
 }
@@ -415,7 +445,7 @@ fn split_into_blocks(func: &mut IrFunction, bril_func: &BrilFunction) -> Result<
 
                     // == Misc ==
                     Op::Print { args } => IrInstruction::Print {
-                        value: args[0].clone(),
+                        values: args.to_vec(),
                     },
 
                     Op::Id { dest, args, .. } => IrInstruction::Assign {

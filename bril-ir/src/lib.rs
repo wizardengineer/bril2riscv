@@ -1,5 +1,6 @@
 pub mod cfg;
 pub mod ssa;
+pub use cfg::IrBasicBlock;
 pub use cfg::IrFunction;
 pub use cfg::IrInstruction;
 pub use cfg::IrModule;
