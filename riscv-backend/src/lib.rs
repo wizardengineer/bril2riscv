@@ -1,6 +1,10 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+pub mod instruction_sel;
+pub mod machine_ir;
+
+pub use instruction_sel::select_instructions;
+pub use machine_ir::MachineBlock;
+pub use machine_ir::MachineFunc;
+pub use machine_ir::MachineInstr;
 
 #[cfg(test)]
 mod tests {
@@ -8,7 +12,6 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+        assert_eq!(4, 4);
     }
 }

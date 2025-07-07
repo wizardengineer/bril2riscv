@@ -66,6 +66,7 @@ dependencies = [
  "bril-frontend",
  "bril-ir",
  "bril-passes",
+ "riscv-backend",
  "serde_json",
 ]
 
@@ -102,6 +103,12 @@ dependencies = [
 [[package]]
 name = "riscv-backend"
 version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bril-frontend",
+ "bril-ir",
+ "bril-passes",
+]
 
 [[package]]
 name = "ryu"

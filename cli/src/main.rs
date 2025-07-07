@@ -6,6 +6,8 @@ use bril_passes::{
     compute_liveness, ConstantFoldPass, ConstantPropagationPass, DeadCodeRemovalPass, PassManager,
 };
 
+use riscv_backend::select_instructions;
+
 fn main() -> Result<()> {
     let json_text = include_str!("../../tests/add.json");
     let bril_prog: Program = serde_json::from_str(&json_text)?;

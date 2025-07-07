@@ -9,4 +9,5 @@ serde_json.workspace = true
 bril-frontend = { path = "../bril-frontend" }
 bril-ir = { path = "../bril-ir" }
 bril-passes= { path = "../bril-passes" }
+riscv-backend= { path = "../riscv-backend" }
 
