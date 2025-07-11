@@ -54,6 +54,7 @@ dependencies = [
  "bril-ir",
  "bril-passes",
  "bril-rs",
+ "riscv-backend",
  "serde",
  "serde_json",
 ]

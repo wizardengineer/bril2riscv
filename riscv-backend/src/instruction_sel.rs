@@ -4,7 +4,7 @@ use bril_ir::{IrFunction, IrInstruction};
 use std::collections::HashMap;
 
 pub fn select_instructions(func: &IrFunction) -> MachineFunc {
-    let mut machine_func: MachineFunc = MachineFunc::new(&func.name);
+    let mut machine_func: MachineFunc = MachineFunc::new(&func);
 
     let mut vreg_mapping: HashMap<String, VReg> = HashMap::new();
     let mut next_vreg = 0;
@@ -32,6 +32,12 @@ pub fn select_instructions(func: &IrFunction) -> MachineFunc {
                         Literal::Bool(i) => *i as i64,
                     };
                     machine_block.instrs.push(MachineInstr::Li { rd, imm });
+                }
+
+                IrInstruction::Assign { lhs, rhs } => {
+                    let rd = allocate_reg(lhs);
+                    let rs1 = allocate_reg(rhs);
+                    machine_block.instrs.push(MachineInstr::Mv { rd, rs1 });
                 }
 
                 IrInstruction::Add { dest, lhs, rhs } => {
@@ -64,6 +70,16 @@ pub fn select_instructions(func: &IrFunction) -> MachineFunc {
                         .push(MachineInstr::Sub { rd, rs1, rs2 });
                 }
 
+                IrInstruction::Div { dest, lhs, rhs } => {
+                    let rd = allocate_reg(dest);
+                    let rs1 = allocate_reg(lhs);
+                    let rs2 = allocate_reg(rhs);
+
+                    machine_block
+                        .instrs
+                        .push(MachineInstr::Div { rd, rs1, rs2 });
+                }
+
                 IrInstruction::Br {
                     cond,
                     then_lbl,
@@ -75,18 +91,18 @@ pub fn select_instructions(func: &IrFunction) -> MachineFunc {
                     // goto else_lbl
                     machine_block.instrs.push(MachineInstr::Beqz {
                         rs1,
-                        imm: else_lbl.to_string(),
+                        label: else_lbl.to_string(),
                     });
 
                     // if rs1 = 1, then goto other label (then_lbl)
                     machine_block.instrs.push(MachineInstr::Jmp {
-                        imm: then_lbl.to_string(),
+                        label: then_lbl.to_string(),
                     });
                 }
 
                 IrInstruction::Jmp { label } => {
                     machine_block.instrs.push(MachineInstr::Jmp {
-                        imm: label.to_string(),
+                        label: label.to_string(),
                     });
                 }
 
@@ -98,8 +114,7 @@ pub fn select_instructions(func: &IrFunction) -> MachineFunc {
                 _ => {}
             }
         }
-
-        machine_func.blocks.push(machine_block);
+        machine_func.blocks.push(machine_block.clone());
     }
     machine_func
 }
