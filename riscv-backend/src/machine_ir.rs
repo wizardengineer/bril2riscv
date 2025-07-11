@@ -1,19 +1,26 @@
-use bril_ir::BlockID;
+use bril_ir::{BlockID, IrFunction};
+use std::collections::HashMap;
 
 #[derive(Default, Debug, Clone)]
 pub struct MachineFunc {
     pub name: String,
     pub args: Vec<VReg>,
     pub blocks: Vec<MachineBlock>,
+    pub label_to_idx: HashMap<String, usize>,
 }
 
 impl MachineFunc {
-    pub fn new(name: &String) -> Self {
+    pub fn new(func: &IrFunction) -> Self {
         Self {
-            name: name.to_string(),
+            name: func.name.to_string(),
             args: Vec::new(),
             blocks: Vec::new(),
+            label_to_idx: func.label_to_idx.clone(),
         }
+    }
+
+    pub fn block_index(&self, label: &String) -> Option<usize> {
+        self.label_to_idx.get(label).copied()
     }
 }
 
@@ -24,7 +31,7 @@ pub struct MachineBlock {
     pub succs: Vec<BlockID>,
 }
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum VReg {
     Virtual(i32),
     // Temp registers
@@ -89,15 +96,18 @@ pub enum MachineInstr {
     // t1 = 1
     Li { rd: VReg, imm: i64 },
 
+    Mv { rd: VReg, rs1: VReg },
     // Control flow Instructions
+    // May not be needed? Seems we can use
+    // Pseudoinstructions like Call or Ret
     Jal { rd: VReg, offset: usize },
 
     // Unconditional jump
-    Jmp { imm: String },
+    Jmp { label: String },
 
-    Beqz { rs1: VReg, imm: String },
+    Beqz { rs1: VReg, label: String },
 
-    Beq { rs1: VReg, rs2: VReg, imm: String },
+    Beq { rs1: VReg, rs2: VReg, label: String },
 
     Ret { rd: VReg },
 
@@ -105,4 +115,39 @@ pub enum MachineInstr {
 
     Print { args: Vec<VReg> },
     // TODO: Add more instructions
+}
+
+impl MachineInstr {
+    pub fn defs(&self) -> Vec<VReg> {
+        match self {
+            MachineInstr::Add { rd, .. }
+            | MachineInstr::Addi { rd, .. }
+            | MachineInstr::Mul { rd, .. }
+            | MachineInstr::Sub { rd, .. }
+            | MachineInstr::Div { rd, .. }
+            | MachineInstr::Mv { rd, .. }
+            | MachineInstr::Li { rd, .. } => {
+                vec![*rd]
+            }
+            _ => Vec::new(),
+        }
+    }
+
+    pub fn uses(&self) -> Vec<VReg> {
+        match self {
+            MachineInstr::Add { rs1, rs2, .. }
+            | MachineInstr::Mul { rs1, rs2, .. }
+            | MachineInstr::Sub { rs1, rs2, .. }
+            | MachineInstr::Beq { rs1, rs2, .. }
+            | MachineInstr::Div { rs1, rs2, .. } => {
+                vec![*rs1, *rs2]
+            }
+
+            MachineInstr::Addi { rs1, .. } | MachineInstr::Mv { rs1, .. } => {
+                vec![*rs1]
+            }
+
+            _ => Vec::new(),
+        }
+    }
 }
