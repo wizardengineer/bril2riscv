@@ -65,8 +65,6 @@ pub struct LinearScan {}
 
 impl LinearScan {
     pub fn new(funcs: &[MachineFunc]) -> Self {
-        // TODO: need to finish this
-
         let mut ra = Self {};
         for func in funcs.iter() {
             let interval = ra.build_intervals(func);
