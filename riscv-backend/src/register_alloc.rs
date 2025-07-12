@@ -8,13 +8,17 @@ use std::{cmp, collections::HashMap};
 pub struct Interval {
     pub start: usize,
     pub end: usize,
+    pub phy_reg: Option<VReg>,
+    pub mark_spilled: bool,
 }
 
 #[derive(Debug, Clone)]
 pub struct LiveIntervals {
     vreg: VReg,
-    interval: Interval,
-    mark_spill: Option<VReg>,
+    start: usize,
+    end: usize,
+    phy_reg: Option<VReg>,
+    mark_spilled: bool,
 }
 
 const ALL_REGS: &[VReg] = &[
@@ -49,11 +53,11 @@ const ALL_REGS: &[VReg] = &[
     VReg::S10,
     VReg::S11,
     // Return address, Stack pointer & Frame pointer
-    VReg::RA,
-    VReg::SP,
-    VReg::FP,
+    //VReg::RA,
+    //VReg::SP,
+    //VReg::FP,
     // Global Register
-    VReg::GP,
+    //VReg::GP,
 ];
 
 #[derive(Debug, Default)]
@@ -61,6 +65,8 @@ pub struct LinearScan {}
 
 impl LinearScan {
     pub fn new(funcs: &[MachineFunc]) -> Self {
+        // TODO: need to finish this
+
         let mut ra = Self {};
         for func in funcs.iter() {
             let interval = ra.build_intervals(func);
@@ -89,6 +95,8 @@ impl LinearScan {
                     let interval = intervals.entry(def).or_insert(Interval {
                         start: *pos,
                         end: *pos,
+                        mark_spilled: false,
+                        phy_reg: None,
                     });
 
                     interval.start = cmp::min(interval.start, *pos);
@@ -98,6 +106,8 @@ impl LinearScan {
                     let interval = intervals.entry(u).or_insert(Interval {
                         start: *pos,
                         end: *pos,
+                        mark_spilled: false,
+                        phy_reg: None,
                     });
 
                     interval.end = cmp::max(interval.end, *pos);
@@ -113,26 +123,59 @@ impl LinearScan {
             .iter()
             .map(|(vreg, interval)| LiveIntervals {
                 vreg: *vreg,
-                interval: interval.clone(),
-                mark_spill: None,
+                start: interval.start,
+                end: interval.end,
+                phy_reg: None,
+                mark_spilled: false,
             })
             .collect();
 
-        live_intervals.sort_by_key(|ivl| ivl.interval.start);
+        live_intervals.sort_by_key(|ivl| ivl.start);
 
         let mut active_alloc_intervals: Vec<LiveIntervals> = Vec::new();
         let mut free_regs = ALL_REGS.to_vec();
 
-        for iv in live_intervals.iter_mut() {
+        for curr_iv in live_intervals.iter_mut() {
             active_alloc_intervals.retain(|old_iv| {
-                if old_iv.interval.end < iv.interval.start {
+                if old_iv.end < curr_iv.start {
+                    // free old one, to be used later for another Virtual register
+                    if let Some(reg) = old_iv.phy_reg {
+                        free_regs.push(reg);
+                    }
                     false
                 } else {
                     true
                 }
             });
 
-            // incompleted
+            // allocate or spill
+            if let Some(reg) = free_regs.pop() {
+                curr_iv.phy_reg = Some(reg);
+                active_alloc_intervals.push(curr_iv.clone());
+
+                // sort by increasing order for end of a interval
+                active_alloc_intervals.sort_by_key(|x| x.end);
+            }
+            // Spill if we can't get any Free Register (free_regs)
+            else {
+                let mut worst = active_alloc_intervals.pop().unwrap();
+
+                if worst.end > curr_iv.end {
+                    curr_iv.phy_reg = worst.phy_reg.take();
+                    curr_iv.mark_spilled = false;
+                    worst.mark_spilled = true;
+                    active_alloc_intervals.push(curr_iv.clone());
+                    active_alloc_intervals.sort_by_key(|x| x.end);
+                } else {
+                    curr_iv.mark_spilled = true;
+                    active_alloc_intervals.push(worst);
+                }
+            }
+
+            if let Some(entry) = intervals.get_mut(&curr_iv.vreg) {
+                entry.phy_reg = curr_iv.phy_reg;
+                entry.mark_spilled = curr_iv.mark_spilled;
+            }
         }
     }
 }
