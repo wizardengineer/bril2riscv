@@ -107,7 +107,12 @@ pub fn select_instructions(func: &IrFunction) -> MachineFunc {
                 }
 
                 IrInstruction::Ret { args } => {
-                    let rd = allocate_reg(&args[0]);
+                    let mut rd = None;
+
+                    if args.is_empty() {
+                        rd = Some(allocate_reg(&args[0]));
+                    }
+
                     machine_block.instrs.push(MachineInstr::Ret { rd });
                 }
 

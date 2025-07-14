@@ -78,6 +78,48 @@ pub enum VReg {
     GP,
 }
 
+impl VReg {
+    pub fn name(&self) -> String {
+        match self {
+            VReg::T0 => "t0".to_string(),
+            VReg::T1 => "t1".to_string(),
+            VReg::T2 => "t2".to_string(),
+            VReg::T3 => "t3".to_string(),
+            VReg::T4 => "t4".to_string(),
+            VReg::T5 => "t5".to_string(),
+            VReg::T6 => "t6".to_string(),
+            VReg::A0 => "a0".to_string(),
+            VReg::A1 => "a1".to_string(),
+            VReg::A2 => "a2".to_string(),
+            VReg::A3 => "a3".to_string(),
+            VReg::A4 => "a4".to_string(),
+            VReg::A5 => "a5".to_string(),
+            VReg::A6 => "a6".to_string(),
+            VReg::A7 => "a7".to_string(),
+
+            VReg::S0 => "s0".to_string(),
+
+            VReg::S1 => "s1".to_string(),
+            VReg::S2 => "s2".to_string(),
+            VReg::S3 => "s3".to_string(),
+            VReg::S4 => "s4".to_string(),
+            VReg::S5 => "s5".to_string(),
+            VReg::S6 => "s6".to_string(),
+            VReg::S7 => "s7".to_string(),
+            VReg::S8 => "s8".to_string(),
+            VReg::S9 => "s9".to_string(),
+            VReg::S10 => "s10".to_string(),
+            VReg::S11 => "s11".to_string(),
+
+            VReg::SP => "sp".to_string(),
+            VReg::RA => "ra".to_string(),
+            VReg::GP => "gp".to_string(),
+            VReg::FP => "fp".to_string(),
+            _ => "rt".to_string(),
+        }
+    }
+}
+
 /// Machine Instructions, 1:1 to RiscV
 #[derive(Debug, Clone)]
 pub enum MachineInstr {
@@ -109,7 +151,7 @@ pub enum MachineInstr {
 
     Beq { rs1: VReg, rs2: VReg, label: String },
 
-    Ret { rd: VReg },
+    Ret { rd: Option<VReg> },
 
     Call { func: String },
 
