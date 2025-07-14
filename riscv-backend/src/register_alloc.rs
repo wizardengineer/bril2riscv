@@ -14,11 +14,11 @@ pub struct Interval {
 
 #[derive(Debug, Clone)]
 pub struct LiveIntervals {
-    vreg: VReg,
-    start: usize,
-    end: usize,
-    phy_reg: Option<VReg>,
-    mark_spilled: bool,
+    pub vreg: VReg,
+    pub start: usize,
+    pub end: usize,
+    pub phy_reg: Option<VReg>,
+    pub mark_spilled: bool,
 }
 
 const ALL_REGS: &[VReg] = &[
@@ -61,16 +61,25 @@ const ALL_REGS: &[VReg] = &[
 ];
 
 #[derive(Debug, Default)]
-pub struct LinearScan {}
+pub struct LinearScan {
+    pub live_intervals: HashMap<VReg, LiveIntervals>,
+}
 
 impl LinearScan {
-    pub fn new(funcs: &[MachineFunc]) -> Self {
-        let mut ra = Self {};
+    pub fn new() -> Self {
+        Self {
+            live_intervals: HashMap::new(),
+        }
+    }
+
+    pub fn run(&mut self, funcs: &[MachineFunc]) -> HashMap<String, HashMap<VReg, LiveIntervals>> {
+        let mut func_by_intervals = HashMap::new();
         for func in funcs.iter() {
-            let interval = ra.build_intervals(func);
+            let mut interval = self.build_intervals(func);
+            func_by_intervals.insert(func.name.clone(), self.linear_scan(&mut interval));
         }
 
-        ra
+        func_by_intervals
     }
 
     pub fn build_intervals(&mut self, mf: &MachineFunc) -> HashMap<VReg, Interval> {
@@ -115,7 +124,10 @@ impl LinearScan {
         intervals
     }
 
-    pub fn linear_scan(&mut self, intervals: &mut HashMap<VReg, Interval>) {
+    pub fn linear_scan(
+        &mut self,
+        intervals: &mut HashMap<VReg, Interval>,
+    ) -> HashMap<VReg, LiveIntervals> {
         // Store our intervals in our Live Intervals sort intervals
         let mut live_intervals: Vec<LiveIntervals> = intervals
             .iter()
@@ -175,5 +187,7 @@ impl LinearScan {
                 entry.mark_spilled = curr_iv.mark_spilled;
             }
         }
+
+        live_intervals.into_iter().map(|iv| (iv.vreg, iv)).collect()
     }
 }
