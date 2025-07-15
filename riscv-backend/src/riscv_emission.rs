@@ -73,14 +73,6 @@ pub fn emit_riscv(module: &[MachineFunc]) {
                         println!("  div {}, {}, {}", phy_reg.name(), prs1.name(), prs2.name());
                     }
 
-                    MachineInstr::Div { rd, rs1, rs2 } => {
-                        let phy_reg = live_intervals[rd].phy_reg.unwrap();
-                        let prs1 = live_intervals[rs1].phy_reg.unwrap();
-                        let prs2 = live_intervals[rs2].phy_reg.unwrap();
-
-                        println!("  div {}, {}, {}", phy_reg.name(), prs1.name(), prs2.name());
-                    }
-
                     MachineInstr::Mv { rd, rs1 } => {
                         let phy_reg = live_intervals[rd].phy_reg.unwrap();
                         let prs1 = live_intervals[rs1].phy_reg.unwrap();
@@ -88,8 +80,8 @@ pub fn emit_riscv(module: &[MachineFunc]) {
                         println!("  mv {}, {}", phy_reg.name(), prs1.name());
                     }
 
-                    MachineInstr::Sw { rs, offset, base } => {
-                        let rs = live_intervals[rs].phy_reg.unwrap();
+                    MachineInstr::Sw { rs1, offset, base } => {
+                        let rs = live_intervals[rs1].phy_reg.unwrap();
                         let base_val = live_intervals[base].phy_reg.unwrap();
 
                         println!("  sw {}, {}({})", rs.name(), offset, base_val.name());
@@ -99,10 +91,19 @@ pub fn emit_riscv(module: &[MachineFunc]) {
                         println!("  call {}", func);
                     }
 
+                    MachineInstr::Jmp { label } => {
+                        println!("  j {}", label);
+                    }
+
+                    MachineInstr::Beqz { rs1, label } => {
+                        //println!("{:#?}", rs1);
+                        let rs = live_intervals[rs1].phy_reg.unwrap();
+                        println!("  beqz {}, {}", rs.name(), label);
+                    }
+
                     MachineInstr::Ret { rd } => {
                         if let Some(r) = rd {
                             let phy_reg = live_intervals[r].phy_reg.unwrap();
-
                             println!("  ret {}", phy_reg.name());
                         } else {
                             println!("  ret");

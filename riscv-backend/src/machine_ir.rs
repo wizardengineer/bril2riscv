@@ -88,6 +88,7 @@ impl VReg {
             VReg::T4 => "t4".to_string(),
             VReg::T5 => "t5".to_string(),
             VReg::T6 => "t6".to_string(),
+
             VReg::A0 => "a0".to_string(),
             VReg::A1 => "a1".to_string(),
             VReg::A2 => "a2".to_string(),
@@ -135,12 +136,12 @@ pub enum MachineInstr {
     Div { rd: VReg, rs1: VReg, rs2: VReg },
 
     // Load & Store
-    // t1 = 1
     Li { rd: VReg, imm: i64 },
 
     Mv { rd: VReg, rs1: VReg },
 
-    Sw { rs: VReg, offset: i32, base: VReg },
+    Sw { rs1: VReg, offset: i32, base: VReg },
+
     // Control flow Instructions
     // May not be needed? Seems we can use
     // Pseudoinstructions like Call or Ret
@@ -187,7 +188,10 @@ impl MachineInstr {
                 vec![*rs1, *rs2]
             }
 
-            MachineInstr::Addi { rs1, .. } | MachineInstr::Mv { rs1, .. } => {
+            MachineInstr::Addi { rs1, .. }
+            | MachineInstr::Sw { rs1, .. }
+            | MachineInstr::Beqz { rs1, .. }
+            | MachineInstr::Mv { rs1, .. } => {
                 vec![*rs1]
             }
 

@@ -1,13 +1,10 @@
 use anyhow::Result;
 use bril_frontend::Program;
 use bril_ir::{IrModule, SSAFormation};
-//use bril_passes::constant_propagate::ConstantPropagationPass;
-use bril_passes::{
-    compute_liveness, ConstantFoldPass, ConstantPropagationPass, DeadCodeRemovalPass, PassManager,
-};
+use bril_passes::{ConstantFoldPass, ConstantPropagationPass, DeadCodeRemovalPass, PassManager};
 
 use riscv_backend::*;
-use std::collections::HashMap;
+//use std::collections::HashMap;
 
 fn main() -> Result<()> {
     let json_text = include_str!("../../tests/factorial.json");
@@ -18,24 +15,21 @@ fn main() -> Result<()> {
     pm.add_pass(ConstantPropagationPass {});
     pm.add_pass(ConstantFoldPass {});
     pm.add_pass(DeadCodeRemovalPass {});
-    pm.run(&mut ir_mod);
+    //pm.run(&mut ir_mod);
 
     let mut machine_module = Vec::new();
     for func in ir_mod.functions.iter() {
         machine_module.push(select_instructions(func));
-        //live_intervals.push(register_alloc.build_intervals(&machine_module.iter().last().unwrap()));
     }
-
-    println!("\n###### Assembly ######");
-    emit_riscv(&machine_module);
-
-    ////println!("{:#?}", ssa);
-    //println!("{:#?}\n", ir_mod);
-    println!("\n###### MachineIR ######");
-    println!("{:#?}\n", machine_module);
 
     println!("\n###### SSA IR ######");
     println!("{:#?}\n", ir_mod);
+
+    println!("\n###### MachineIR ######");
+    println!("{:#?}\n", machine_module);
+
+    println!("\n###### Assembly ######");
+    emit_riscv(&machine_module);
 
     Ok(())
 }

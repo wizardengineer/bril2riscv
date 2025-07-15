@@ -98,7 +98,7 @@ pub fn select_instructions(func: &IrFunction) -> MachineFunc {
                                     5 => VReg::A5,
                                     6 => VReg::A6,
                                     7 => VReg::A7,
-                                    _ => !unreachable!(),
+                                    _ => unreachable!(),
                                 };
                                 machine_block.instrs.push(MachineInstr::Mv {
                                     rd: a_reg,
@@ -109,7 +109,7 @@ pub fn select_instructions(func: &IrFunction) -> MachineFunc {
                                 machine_block.instrs.push(MachineInstr::Sw {
                                     offset,
                                     base: VReg::SP,
-                                    rs: src_reg,
+                                    rs1: src_reg,
                                 });
                             }
                         }
