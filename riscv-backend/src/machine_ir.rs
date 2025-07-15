@@ -145,7 +145,7 @@ pub enum MachineInstr {
     // Control flow Instructions
     // May not be needed? Seems we can use
     // Pseudoinstructions like Call or Ret
-    Jal { rd: VReg, offset: usize },
+    Jal { rd: VReg, label: String },
 
     // Unconditional jump
     Jmp { label: String },

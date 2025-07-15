@@ -152,7 +152,7 @@ pub enum IrInstruction {
     Call {
         target_func: String,
         args: Vec<String>,
-        dest: String,
+        dest: Option<String>,
     },
 
     Br {
@@ -214,7 +214,13 @@ impl IrInstruction {
             | IrInstruction::Assign { lhs: dest, .. }
             | IrInstruction::Phi { dest, .. } => std::slice::from_ref(dest),
 
-            IrInstruction::Call { dest, .. } => std::slice::from_ref(dest),
+            IrInstruction::Call { dest, .. } => {
+                if let Some(d) = dest {
+                    std::slice::from_ref(d)
+                } else {
+                    &[]
+                }
+            },
 
             _ => &[],
         }
@@ -428,7 +434,7 @@ fn split_into_blocks(func: &mut IrFunction, bril_func: &BrilFunction) -> Result<
                     } => IrInstruction::Call {
                         target_func: funcs[0].clone(),
                         args: args.clone(),
-                        dest: dest.as_ref().unwrap().clone(),
+                        dest: Some(dest.as_ref().unwrap().clone()),
                     },
 
                     Op::Br { args, labels } => IrInstruction::Br {

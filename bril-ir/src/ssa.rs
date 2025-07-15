@@ -259,7 +259,9 @@ pub fn rename_pass(
                         }
                     }
 
-                    *dest = create_new_name(dest, counter, stacks);
+                    if let Some(d) = dest {
+                        *dest = Some(create_new_name(d, counter, stacks));
+                    }
                 }
 
                 IrInstruction::Print { values } => {

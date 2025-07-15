@@ -7,7 +7,7 @@ use riscv_backend::*;
 //use std::collections::HashMap;
 
 fn main() -> Result<()> {
-    let json_text = include_str!("../../tests/factorial.json");
+    let json_text = include_str!("../../tests/palindrome.json");
     let bril_prog: Program = serde_json::from_str(&json_text)?;
     let mut ir_mod: IrModule = IrModule::try_from(&bril_prog)?;
     let _ = SSAFormation::try_from(&mut ir_mod)?;
@@ -15,11 +15,12 @@ fn main() -> Result<()> {
     pm.add_pass(ConstantPropagationPass {});
     pm.add_pass(ConstantFoldPass {});
     pm.add_pass(DeadCodeRemovalPass {});
-    //pm.run(&mut ir_mod);
+    pm.run(&mut ir_mod);
 
     let mut machine_module = Vec::new();
     for func in ir_mod.functions.iter() {
-        machine_module.push(select_instructions(func));
+        let mf = select_instructions(func);
+        machine_module.push(mf);
     }
 
     println!("\n###### SSA IR ######");
