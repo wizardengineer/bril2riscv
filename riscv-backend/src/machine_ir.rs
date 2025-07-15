@@ -139,6 +139,8 @@ pub enum MachineInstr {
     Li { rd: VReg, imm: i64 },
 
     Mv { rd: VReg, rs1: VReg },
+
+    Sw { rs: VReg, offset: i32, base: VReg },
     // Control flow Instructions
     // May not be needed? Seems we can use
     // Pseudoinstructions like Call or Ret

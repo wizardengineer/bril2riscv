@@ -80,6 +80,57 @@ pub fn select_instructions(func: &IrFunction) -> MachineFunc {
                         .push(MachineInstr::Div { rd, rs1, rs2 });
                 }
 
+                IrInstruction::Call {
+                    dest,
+                    target_func,
+                    args,
+                } => {
+                    if !args.is_empty() {
+                        for (i, arg) in args.iter().enumerate() {
+                            let src_reg = allocate_reg(arg);
+                            if i < 8 {
+                                let a_reg = match i {
+                                    0 => VReg::A0,
+                                    1 => VReg::A1,
+                                    2 => VReg::A2,
+                                    3 => VReg::A3,
+                                    4 => VReg::A4,
+                                    5 => VReg::A5,
+                                    6 => VReg::A6,
+                                    7 => VReg::A7,
+                                    _ => !unreachable!(),
+                                };
+                                machine_block.instrs.push(MachineInstr::Mv {
+                                    rd: a_reg,
+                                    rs1: src_reg,
+                                });
+                            } else {
+                                let offset = ((i - 8) * 8) as i32;
+                                machine_block.instrs.push(MachineInstr::Sw {
+                                    offset,
+                                    base: VReg::SP,
+                                    rs: src_reg,
+                                });
+                            }
+                        }
+
+                        machine_block.instrs.push(MachineInstr::Call {
+                            func: target_func.to_string(),
+                        });
+
+                        if dest.is_empty() {
+                            continue;
+                        }
+
+                        let return_value = allocate_reg(dest);
+                        // A0 is the returh value
+                        machine_block.instrs.push(MachineInstr::Mv {
+                            rd: VReg::A0,
+                            rs1: return_value,
+                        });
+                    }
+                }
+
                 IrInstruction::Br {
                     cond,
                     then_lbl,

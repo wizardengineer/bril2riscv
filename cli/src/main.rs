@@ -10,7 +10,7 @@ use riscv_backend::*;
 use std::collections::HashMap;
 
 fn main() -> Result<()> {
-    let json_text = include_str!("../../tests/add.json");
+    let json_text = include_str!("../../tests/factorial.json");
     let bril_prog: Program = serde_json::from_str(&json_text)?;
     let mut ir_mod: IrModule = IrModule::try_from(&bril_prog)?;
     let _ = SSAFormation::try_from(&mut ir_mod)?;
@@ -18,7 +18,7 @@ fn main() -> Result<()> {
     pm.add_pass(ConstantPropagationPass {});
     pm.add_pass(ConstantFoldPass {});
     pm.add_pass(DeadCodeRemovalPass {});
-    //pm.run(&mut ir_mod);
+    pm.run(&mut ir_mod);
 
     let mut machine_module = Vec::new();
     for func in ir_mod.functions.iter() {
@@ -26,10 +26,16 @@ fn main() -> Result<()> {
         //live_intervals.push(register_alloc.build_intervals(&machine_module.iter().last().unwrap()));
     }
 
+    println!("\n###### Assembly ######");
     emit_riscv(&machine_module);
 
     ////println!("{:#?}", ssa);
     //println!("{:#?}\n", ir_mod);
+    println!("\n###### MachineIR ######");
     println!("{:#?}\n", machine_module);
+
+    println!("\n###### SSA IR ######");
+    println!("{:#?}\n", ir_mod);
+
     Ok(())
 }
