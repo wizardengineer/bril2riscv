@@ -10,6 +10,7 @@ pub use liveness::*;
 pub use pass_manager::FunctionPass;
 pub use pass_manager::PassManager;
 
+// TODO: Need to create a proper test for this crate
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -95,6 +96,7 @@ mod tests {
     }
 
     #[test]
+    // TODO: Need to finish this
     fn simple_test_liveness() {
         let mut func = diamond_cfg();
         create_def_sites(&mut func).unwrap();

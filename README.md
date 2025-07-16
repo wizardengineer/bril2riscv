@@ -9,14 +9,13 @@ Current Game Plan:
    parse JSON → flat IR → CFG → SSA
      ↓
    [1] CCP             // constant‐fold + branch elimination
-   [2] GVN (or LVN)    // global (or local) value‐numbering
-   [3] Liveness + DCE  // kill any defs that aren’t used
+   [2] Liveness + DCE  // kill any defs that aren’t used
      ↓
-   break SSA (rewrite ϕ)
+   break SSA 
      ↓
-   instruction selection (per op → RISC-V template)
+   instruction selection [per op → RISC-V template (MachineIR)]
      ↓
-   build live‐intervals (reuse your liveness)
+   build live‐intervals 
      ↓
    linear-scan register allocation
      ↓
